@@ -804,6 +804,13 @@
             <div class="stat-subtext">Entry donations collected</div>
             <i class="fa-solid fa-indian-rupee-sign stat-icon" style="color: var(--accent-gold-light);"></i>
           </div>
+
+          <div id="stat-mybalance-card" class="stat-card hidden">
+            <div class="stat-label">My Balance Due to Admin</div>
+            <div class="stat-value" id="stat-mybalance" style="color: #FCA5A5;">₹0</div>
+            <div class="stat-subtext" id="stat-mycollection-subtext">Collected ₹0 | Submitted ₹0</div>
+            <i class="fa-solid fa-hand-holding-dollar stat-icon" style="color: #FCA5A5;"></i>
+          </div>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
@@ -831,6 +838,9 @@
                     <th>Registrations</th>
                     <th>Gate Scanned (Checked-In)</th>
                     <th>Collection</th>
+                    <th>Submitted</th>
+                    <th>Balance Due</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody id="leaderboard-body">
@@ -879,15 +889,42 @@
                 <div class="form-group">
                   <label class="form-label">Free Entry Pass</label>
                   <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer;">
-                    <input type="checkbox" id="reg-free-entry" onchange="toggleFreeEntry(this.checked)">
-                    <span style="font-weight: 600; font-size: 0.85rem; color: var(--accent-gold-light);">Free Pass (Rs. 0)</span>
+                    <input type="checkbox" id="reg-free-entry" onchange="updateBookingTotal()">
+                    <span style="font-weight: 600; font-size: 0.85rem; color: var(--accent-gold-light);">Free Pass (No Token Charge)</span>
                   </label>
                 </div>
               </div>
 
-              <div class="form-group" id="paid-field-container">
-                <label class="form-label">Amount Paid / Donation (₹)</label>
-                <input type="number" id="reg-paid" class="form-control" value="0" min="0" placeholder="0">
+              <div class="form-group">
+                <label class="form-label">Token / Entry Charge <span id="reg-rate-hint" style="color: var(--text-muted); font-weight: 400;"></span></label>
+                <div id="reg-token-amount-display" style="padding: 0.7rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; font-weight: 700; color: var(--accent-gold-light);">₹0</div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; margin-top: 0.75rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
+                  <input type="checkbox" id="reg-aarti" onchange="toggleFacilityAmount('aarti')">
+                  <span style="font-weight: 600; font-size: 0.85rem;">Aarti Seva</span>
+                </label>
+                <input type="number" id="reg-aarti-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateBookingTotal()">
+              </div>
+
+              <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; margin-top: 0.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
+                  <input type="checkbox" id="reg-abhishek" onchange="toggleFacilityAmount('abhishek')">
+                  <span style="font-weight: 600; font-size: 0.85rem;">Abhishek Seva</span>
+                </label>
+                <input type="number" id="reg-abhishek-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateBookingTotal()">
+              </div>
+
+              <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="form-label">Donation (₹) &mdash; 80G Receipt Issued Later</label>
+                <input type="number" id="reg-donation-amount" class="form-control" value="0" min="0" placeholder="0" oninput="updateBookingTotal()">
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.3rem;">Optional. Donor receives an 80G tax exemption receipt separately.</p>
+              </div>
+
+              <div class="form-group" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                <label class="form-label">Total Amount to Collect</label>
+                <div id="reg-total-display" style="padding: 0.8rem; background: rgba(6, 182, 212, 0.15); border: 1px solid var(--accent-peacock); border-radius: 10px; font-weight: 800; font-size: 1.2rem; color: white;">₹0</div>
               </div>
 
               <button type="submit" class="btn-primary" style="margin-top: 1rem;">
@@ -1037,6 +1074,28 @@
 
           <div class="glass-card">
             <div class="glass-card-title">
+              <span><i class="fa-solid fa-indian-rupee-sign"></i> Pricing Settings</span>
+            </div>
+            <form id="settings-form">
+              <div class="form-group">
+                <label class="form-label">Token / Entry Charge (₹ per person) *</label>
+                <input type="number" id="settings-token-rate" class="form-control" min="0" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Aarti Seva Suggested Price (₹) *</label>
+                <input type="number" id="settings-aarti-price" class="form-control" min="0" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Abhishek Seva Suggested Price (₹) *</label>
+                <input type="number" id="settings-abhishek-price" class="form-control" min="0" required>
+              </div>
+              <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 0.75rem;">Volunteers can still enter a custom Aarti/Abhishek amount per family &mdash; these are just the suggested defaults.</p>
+              <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Pricing</button>
+            </form>
+          </div>
+
+          <div class="glass-card">
+            <div class="glass-card-title">
               <span><i class="fa-solid fa-toolbox"></i> Reports & System Actions</span>
             </div>
             
@@ -1108,6 +1167,30 @@
       <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.6rem;">
         <i class="fa-solid fa-circle-info"></i> WhatsApp can't auto-attach the QR image via link &mdash; clicking "Send via WhatsApp" downloads the QR first, then opens the chat so you can attach it manually.
       </p>
+    </div>
+  </div>
+
+  <!-- ── SETTLEMENT (CASH/UPI REMITTANCE) MODAL ── -->
+  <div id="settlement-modal" class="modal-overlay">
+    <div class="token-card">
+      <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">Record Payment Received</h4>
+      <h2 id="settlement-volunteer-name" style="color: white; font-size: 1.25rem; font-weight: 700;">Volunteer Name</h2>
+      <p id="settlement-balance-hint" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;"></p>
+
+      <form id="settlement-form">
+        <div class="form-group">
+          <label class="form-label">Amount Received (₹) *</label>
+          <input type="number" id="settlement-amount" class="form-control" min="1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Note</label>
+          <input type="text" id="settlement-note" class="form-control" placeholder="e.g. Cash handed over at counter">
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-hand-holding-dollar"></i> Record</button>
+          <button type="button" class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closeSettlementModal()">Cancel</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1192,13 +1275,16 @@
         document.getElementById('nav-users-tab').classList.remove('hidden');
         document.getElementById('stat-collection-card').classList.remove('hidden');
         document.getElementById('leaderboard-section').classList.remove('hidden');
+        document.getElementById('stat-mybalance-card').classList.add('hidden');
       } else {
         document.getElementById('nav-users-tab').classList.add('hidden');
         document.getElementById('stat-collection-card').classList.add('hidden');
         document.getElementById('leaderboard-section').classList.add('hidden');
+        document.getElementById('stat-mybalance-card').classList.remove('hidden');
       }
 
       switchTab('dashboard');
+      loadPricingSettings();
     }
 
     function switchTab(tabId) {
@@ -1215,8 +1301,42 @@
       if (tabId === 'registrations') loadRegistrations();
       if (tabId === 'attendance') loadAttendanceLog();
       if (tabId === 'scan') initScanner();
-      if (tabId === 'users' && currentUser.role === 'admin') loadUsersList();
+      if (tabId === 'users' && currentUser.role === 'admin') {
+        loadUsersList();
+        populateSettingsForm();
+      }
     }
+
+    async function populateSettingsForm() {
+      await loadPricingSettings();
+      document.getElementById('settings-token-rate').value = pricingSettings.token_rate;
+      document.getElementById('settings-aarti-price').value = pricingSettings.aarti_price;
+      document.getElementById('settings-abhishek-price').value = pricingSettings.abhishek_price;
+    }
+
+    document.getElementById('settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token_rate = parseInt(document.getElementById('settings-token-rate').value || 0);
+      const aarti_price = parseInt(document.getElementById('settings-aarti-price').value || 0);
+      const abhishek_price = parseInt(document.getElementById('settings-abhishek-price').value || 0);
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ token_rate, aarti_price, abhishek_price })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert('Pricing settings saved.');
+          loadPricingSettings();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to save settings'));
+        }
+      } catch (err) {
+        alert('Server error while saving settings');
+      }
+    });
 
     // ── DASHBOARD LOAD ──
     async function loadDashboardStats() {
@@ -1239,11 +1359,17 @@
         const hData = await hRes.json();
         renderHourlyChart(hData.hourly);
 
-        // Leaderboard
+        // Leaderboard (admin) / My Balance (volunteer)
         if (currentUser.role === 'admin') {
           const uRes = await fetch(`${API_BASE}/api/admin/user-stats`, { credentials: 'include' });
           const uData = await uRes.json();
           renderLeaderboard(uData.user_stats);
+        } else {
+          const mRes = await fetch(`${API_BASE}/api/my-stats`, { credentials: 'include' });
+          const mData = await mRes.json();
+          document.getElementById('stat-mybalance').textContent = `₹${(mData.balance_due || 0).toLocaleString('en-IN')}`;
+          document.getElementById('stat-mycollection-subtext').textContent =
+            `Collected ₹${mData.collection || 0} | Submitted ₹${mData.submitted || 0}`;
         }
       } catch (err) {
         console.error('Stats load error:', err);
@@ -1274,36 +1400,121 @@
       });
     }
 
+    let volunteersById = {};
+
     function renderLeaderboard(users) {
+      volunteersById = Object.fromEntries(users.map(u => [u.id, u]));
       const body = document.getElementById('leaderboard-body');
       body.innerHTML = users.map(u => `
         <tr>
           <td><strong>${u.name}</strong> <small style="color: var(--text-muted);">(@${u.username})</small></td>
-          <td>${u.families_registered}</td>
-          <td>${u.persons_registered}</td>
+          <td>${u.families_registered} fam. / ${u.persons_registered} pers.</td>
+          <td>${u.families_scanned} fam. / ${u.persons_scanned} pers.</td>
           <td style="color: var(--accent-gold-light); font-weight: 700;">₹${u.collection}</td>
+          <td>₹${u.submitted}</td>
+          <td style="color: ${u.balance_due > 0 ? '#FCA5A5' : '#34D399'}; font-weight: 700;">₹${u.balance_due}</td>
+          <td>
+            <button class="btn-primary" style="padding: 0.35rem 0.7rem; font-size: 0.78rem;" onclick="openSettlementModal(${u.id})">
+              <i class="fa-solid fa-hand-holding-dollar"></i> Record Payment
+            </button>
+          </td>
         </tr>
       `).join('');
     }
 
-    // ── REGISTER FAMILY ──
+    function openSettlementModal(volunteerId) {
+      const u = volunteersById[volunteerId];
+      if (!u) return;
+      document.getElementById('settlement-form').dataset.volunteerId = volunteerId;
+      document.getElementById('settlement-volunteer-name').textContent = u.name;
+      document.getElementById('settlement-balance-hint').textContent =
+        `Collected: ₹${u.collection} | Already submitted: ₹${u.submitted} | Balance due: ₹${u.balance_due}`;
+      document.getElementById('settlement-amount').value = u.balance_due > 0 ? u.balance_due : '';
+      document.getElementById('settlement-note').value = '';
+      document.getElementById('settlement-modal').classList.add('active');
+    }
+
+    function closeSettlementModal() {
+      document.getElementById('settlement-modal').classList.remove('active');
+    }
+
+    document.getElementById('settlement-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const volunteer_id = parseInt(e.target.dataset.volunteerId);
+      const amount = parseInt(document.getElementById('settlement-amount').value || 0);
+      const note = document.getElementById('settlement-note').value;
+      if (!amount || amount <= 0) {
+        alert('Enter a valid amount greater than zero.');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settlements`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ volunteer_id, amount, note })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          closeSettlementModal();
+          loadDashboardStats();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to record payment'));
+        }
+      } catch (err) {
+        alert('Server error while recording payment');
+      }
+    });
+
+    // ── REGISTER FAMILY / PRICING ──
+    let pricingSettings = { token_rate: 20, aarti_price: 101, abhishek_price: 251 };
+
+    async function loadPricingSettings() {
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`, { credentials: 'include' });
+        if (res.ok) pricingSettings = await res.json();
+      } catch (err) {
+        console.error('Failed to load pricing settings:', err);
+      }
+      const hint = document.getElementById('reg-rate-hint');
+      if (hint) hint.textContent = `(₹${pricingSettings.token_rate}/person)`;
+      updateBookingTotal();
+    }
+
     function updatePersons(delta) {
       const input = document.getElementById('reg-persons');
       let val = parseInt(input.value) + delta;
       if (val >= 1 && val <= 50) input.value = val;
+      updateBookingTotal();
     }
 
-    function toggleFreeEntry(isFree) {
-      const container = document.getElementById('paid-field-container');
-      const paidInput = document.getElementById('reg-paid');
-      if (isFree) {
-        container.style.opacity = '0.4';
-        paidInput.value = 0;
-        paidInput.disabled = true;
+    function toggleFacilityAmount(type) {
+      const checkbox = document.getElementById(`reg-${type}`);
+      const amountInput = document.getElementById(`reg-${type}-amount`);
+      if (checkbox.checked) {
+        amountInput.disabled = false;
+        if (parseInt(amountInput.value || 0) <= 0) {
+          amountInput.value = pricingSettings[`${type}_price`] || 0;
+        }
       } else {
-        container.style.opacity = '1';
-        paidInput.disabled = false;
+        amountInput.disabled = true;
+        amountInput.value = 0;
       }
+      updateBookingTotal();
+    }
+
+    function updateBookingTotal() {
+      const persons = parseInt(document.getElementById('reg-persons').value || 1);
+      const freeEntry = document.getElementById('reg-free-entry').checked;
+      const tokenAmount = freeEntry ? 0 : persons * pricingSettings.token_rate;
+      const aartiAmount = document.getElementById('reg-aarti').checked ? parseInt(document.getElementById('reg-aarti-amount').value || 0) : 0;
+      const abhishekAmount = document.getElementById('reg-abhishek').checked ? parseInt(document.getElementById('reg-abhishek-amount').value || 0) : 0;
+      const donationAmount = parseInt(document.getElementById('reg-donation-amount').value || 0);
+      const total = tokenAmount + aartiAmount + abhishekAmount + donationAmount;
+
+      document.getElementById('reg-token-amount-display').textContent = `₹${tokenAmount}`;
+      document.getElementById('reg-total-display').textContent = `₹${total}`;
+      return { tokenAmount, aartiAmount, abhishekAmount, donationAmount, total };
     }
 
     document.getElementById('register-form').addEventListener('submit', async (e) => {
@@ -1313,25 +1524,25 @@
       const address = document.getElementById('reg-address').value;
       const persons = parseInt(document.getElementById('reg-persons').value);
       const free_entry = document.getElementById('reg-free-entry').checked;
-      const paid = free_entry ? 0 : parseInt(document.getElementById('reg-paid').value || 0);
-
-      if (!free_entry && paid <= 0) {
-        alert('Enter the amount paid, or check "Free Pass" if no payment was collected.');
-        return;
-      }
+      const aarti_amount = document.getElementById('reg-aarti').checked ? parseInt(document.getElementById('reg-aarti-amount').value || 0) : 0;
+      const abhishek_amount = document.getElementById('reg-abhishek').checked ? parseInt(document.getElementById('reg-abhishek-amount').value || 0) : 0;
+      const donation_amount = parseInt(document.getElementById('reg-donation-amount').value || 0);
 
       try {
         const res = await fetch(`${API_BASE}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name, mobile, address, persons, free_entry, paid })
+          body: JSON.stringify({ name, mobile, address, persons, free_entry, aarti_amount, abhishek_amount, donation_amount })
         });
         const data = await res.json();
         if (res.ok && data.success) {
           data.mobile = mobile;
           document.getElementById('register-form').reset();
           document.getElementById('reg-persons').value = 1;
+          document.getElementById('reg-aarti-amount').disabled = true;
+          document.getElementById('reg-abhishek-amount').disabled = true;
+          updateBookingTotal();
           showTokenModal(data);
         } else {
           alert('Registration Error: ' + (data.error || 'Failed'));
@@ -1343,11 +1554,22 @@
 
     let currentTokenData = null;
 
+    function amountBreakdownLines(data) {
+      const lines = [];
+      lines.push(data.free_entry ? 'Entry: Free Pass' : `Token Entry: ₹${data.token_amount}`);
+      if (data.aarti_amount) lines.push(`Aarti Seva: ₹${data.aarti_amount}`);
+      if (data.abhishek_amount) lines.push(`Abhishek Seva: ₹${data.abhishek_amount}`);
+      if (data.donation_amount) lines.push(`Donation (80G): ₹${data.donation_amount}`);
+      lines.push(`Total: ₹${data.paid}`);
+      return lines;
+    }
+
     function showTokenModal(data) {
       currentTokenData = data;
       document.getElementById('modal-token-num').textContent = data.token;
       document.getElementById('modal-name').textContent = data.name;
-      document.getElementById('modal-details').textContent = `${data.persons} Family Member(s) | ${data.free_entry ? 'Free Entry Pass' : 'Paid ₹' + data.paid}`;
+      document.getElementById('modal-details').innerHTML =
+        `${data.persons} Family Member(s)<br>` + amountBreakdownLines(data).join(' &middot; ');
 
       const qrContainer = document.getElementById('modal-qrcode');
       qrContainer.innerHTML = '';
@@ -1382,8 +1604,8 @@
     }
 
     function buildWhatsAppMessage(data) {
-      const entryLine = data.free_entry ? 'Entry: Free Pass' : `Paid: ₹${data.paid}`;
-      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${entryLine}\n\n📌 Please keep the attached QR code image handy and show it at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
+      const breakdown = amountBreakdownLines(data).join('\n');
+      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached QR code image handy and show it at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
     }
 
     function sendViaWhatsApp() {

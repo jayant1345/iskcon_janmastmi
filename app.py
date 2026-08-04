@@ -146,36 +146,60 @@ def init_db():
                 ) ENGINE=InnoDB CHARACTER SET utf8mb4
             """)
 
+            # ── SETTINGS (admin-adjustable pricing) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    id             INT PRIMARY KEY DEFAULT 1,
+                    token_rate     INT NOT NULL DEFAULT 20,
+                    aarti_price    INT NOT NULL DEFAULT 101,
+                    abhishek_price INT NOT NULL DEFAULT 251,
+                    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB
+            """)
+            cur.execute("INSERT IGNORE INTO settings (id, token_rate, aarti_price, abhishek_price) VALUES (1, 20, 101, 251)")
+
+            # ── SETTLEMENTS (volunteer cash/UPI remittance to central admin) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settlements (
+                    id           INT AUTO_INCREMENT PRIMARY KEY,
+                    volunteer_id INT          NOT NULL,
+                    amount       INT          NOT NULL,
+                    note         VARCHAR(255) NULL,
+                    recorded_by  INT          NULL,
+                    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (volunteer_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_volunteer (volunteer_id)
+                ) ENGINE=InnoDB CHARACTER SET utf8mb4
+            """)
+
             # ── Migration Helpers ──
-            for col_sql, col_name in [
-                ("ALTER TABLE registrations ADD COLUMN registered_by INT NULL", "registered_by"),
-                ("ALTER TABLE registrations ADD COLUMN free_entry TINYINT(1) NOT NULL DEFAULT 0", "free_entry"),
-            ]:
+            migrations = [
+                ('registrations', 'registered_by',    "ALTER TABLE registrations ADD COLUMN registered_by INT NULL"),
+                ('registrations', 'free_entry',        "ALTER TABLE registrations ADD COLUMN free_entry TINYINT(1) NOT NULL DEFAULT 0"),
+                ('registrations', 'token_amount',       "ALTER TABLE registrations ADD COLUMN token_amount INT NOT NULL DEFAULT 0"),
+                ('registrations', 'aarti_amount',       "ALTER TABLE registrations ADD COLUMN aarti_amount INT NOT NULL DEFAULT 0"),
+                ('registrations', 'abhishek_amount',    "ALTER TABLE registrations ADD COLUMN abhishek_amount INT NOT NULL DEFAULT 0"),
+                ('registrations', 'donation_amount',    "ALTER TABLE registrations ADD COLUMN donation_amount INT NOT NULL DEFAULT 0"),
+                ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
+            ]
+            for table, col_name, col_sql in migrations:
                 try:
                     cur.execute("""
                         SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
                         WHERE TABLE_SCHEMA = DATABASE()
-                          AND TABLE_NAME = 'registrations'
+                          AND TABLE_NAME = %s
                           AND COLUMN_NAME = %s
-                    """, (col_name,))
+                    """, (table, col_name))
                     if cur.fetchone()['cnt'] == 0:
                         cur.execute(col_sql)
-                        log.info(f'Migration: added column {col_name}')
+                        log.info(f'Migration: added column {table}.{col_name}')
+                except pymysql.err.OperationalError as me:
+                    if me.args and me.args[0] == 1060:
+                        pass  # Duplicate column: another gunicorn worker won the race, harmless
+                    else:
+                        log.error(f'Migration error ({table}.{col_name}): {me}')
                 except Exception as me:
-                    log.error(f'Migration error ({col_name}): {me}')
-
-            try:
-                cur.execute("""
-                    SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_SCHEMA = DATABASE()
-                      AND TABLE_NAME = 'attendance'
-                      AND COLUMN_NAME = 'scanned_by'
-                """)
-                if cur.fetchone()['cnt'] == 0:
-                    cur.execute("ALTER TABLE attendance ADD COLUMN scanned_by INT NULL")
-                    log.info('Migration: added scanned_by column to attendance table')
-            except Exception as me:
-                log.error(f'Migration error (scanned_by): {me}')
+                    log.error(f'Migration error ({table}.{col_name}): {me}')
 
             # ── Seed default admin user ──
             admin_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -407,16 +431,117 @@ def delete_user(uid):
     return jsonify({'success': True})
 
 # ============================================================
+#  PRICING SETTINGS (per-person token rate, Aarti/Abhishek suggested prices)
+# ============================================================
+def get_settings_row():
+    row = db_query("SELECT token_rate, aarti_price, abhishek_price FROM settings WHERE id = 1", fetch='one')
+    if not row:
+        return {'token_rate': 20, 'aarti_price': 101, 'abhishek_price': 251}
+    return row
+
+@app.route('/api/settings', methods=['GET'])
+@login_required
+def get_settings():
+    try:
+        return jsonify(get_settings_row())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/settings', methods=['PUT'])
+@admin_required
+def update_settings():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data sent'}), 400
+    try:
+        current = get_settings_row()
+        token_rate     = int(data.get('token_rate', current['token_rate']))
+        aarti_price    = int(data.get('aarti_price', current['aarti_price']))
+        abhishek_price = int(data.get('abhishek_price', current['abhishek_price']))
+        if token_rate < 0 or aarti_price < 0 or abhishek_price < 0:
+            return jsonify({'error': 'Prices cannot be negative'}), 400
+        db_execute(
+            "UPDATE settings SET token_rate=%s, aarti_price=%s, abhishek_price=%s WHERE id=1",
+            (token_rate, aarti_price, abhishek_price)
+        )
+        log.info(f'Settings updated by {session.get("username")}: rate={token_rate} aarti={aarti_price} abhishek={abhishek_price}')
+        return jsonify({'success': True, 'token_rate': token_rate, 'aarti_price': aarti_price, 'abhishek_price': abhishek_price})
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Prices must be whole numbers'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+#  VOLUNTEER SETTLEMENTS (cash/UPI collected -> remitted to central admin)
+# ============================================================
+@app.route('/api/admin/settlements', methods=['GET'])
+@admin_required
+def list_settlements():
+    try:
+        volunteer_id = request.args.get('volunteer_id')
+        if volunteer_id:
+            rows = db_query("""
+                SELECT s.*, u.name AS volunteer_name, u.username AS volunteer_username, r.name AS recorded_by_name
+                FROM settlements s
+                JOIN users u ON u.id = s.volunteer_id
+                LEFT JOIN users r ON r.id = s.recorded_by
+                WHERE s.volunteer_id = %s
+                ORDER BY s.created_at DESC
+            """, (volunteer_id,))
+        else:
+            rows = db_query("""
+                SELECT s.*, u.name AS volunteer_name, u.username AS volunteer_username, r.name AS recorded_by_name
+                FROM settlements s
+                JOIN users u ON u.id = s.volunteer_id
+                LEFT JOIN users r ON r.id = s.recorded_by
+                ORDER BY s.created_at DESC
+            """)
+        for row in rows:
+            if row.get('created_at'):
+                row['created_at'] = row['created_at'].strftime('%d/%m/%Y %H:%M')
+        return jsonify({'settlements': rows})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/settlements', methods=['POST'])
+@admin_required
+def create_settlement():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data sent'}), 400
+    try:
+        volunteer_id = int(data.get('volunteer_id', 0))
+        amount = int(data.get('amount', 0))
+        note = str(data.get('note', '')).strip()[:255]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid volunteer or amount'}), 400
+
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than zero'}), 400
+    volunteer = db_query("SELECT id, name FROM users WHERE id = %s", (volunteer_id,), fetch='one')
+    if not volunteer:
+        return jsonify({'error': 'Volunteer not found'}), 404
+
+    sid = db_execute(
+        "INSERT INTO settlements (volunteer_id, amount, note, recorded_by) VALUES (%s, %s, %s, %s)",
+        (volunteer_id, amount, note, session['user_id'])
+    )
+    log.info(f'Settlement recorded: volunteer={volunteer["name"]} amount={amount} by={session.get("username")}')
+    return jsonify({'success': True, 'id': sid}), 201
+
+# ============================================================
 #  STATISTICS & ANALYTICS
 # ============================================================
 @app.route('/api/stats', methods=['GET'])
 @login_required
 def get_stats():
     try:
-        reg_row = db_query(
-            "SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons, COALESCE(SUM(paid),0) AS collection FROM registrations",
-            fetch='one'
-        )
+        reg_row = db_query("""
+            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons, COALESCE(SUM(paid),0) AS collection,
+                   COALESCE(SUM(token_amount),0) AS token_total, COALESCE(SUM(aarti_amount),0) AS aarti_total,
+                   COALESCE(SUM(abhishek_amount),0) AS abhishek_total, COALESCE(SUM(donation_amount),0) AS donation_total
+            FROM registrations
+        """, fetch='one')
         att_row = db_query(
             "SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons FROM attendance",
             fetch='one'
@@ -430,6 +555,10 @@ def get_stats():
         }
         if session.get('role') == 'admin':
             result['collection'] = int(reg_row['collection'])
+            result['token_total'] = int(reg_row['token_total'])
+            result['aarti_total'] = int(reg_row['aarti_total'])
+            result['abhishek_total'] = int(reg_row['abhishek_total'])
+            result['donation_total'] = int(reg_row['donation_total'])
         return jsonify(result)
     except Exception as e:
         log.error(f'stats error: {e}')
@@ -439,29 +568,58 @@ def get_stats():
 @admin_required
 def user_stats():
     try:
+        # Registrations and attendance are aggregated in separate subqueries before
+        # joining to users. Joining both tables directly in one GROUP BY fans out
+        # matching rows (every registration x every attendance row for that user),
+        # which silently inflates or (with the old SUM(DISTINCT) workaround)
+        # undercounts the collection total whenever two amounts happen to match.
         rows = db_query("""
             SELECT
                 u.id,
                 u.name,
                 u.username,
                 u.mobile,
-                COUNT(DISTINCT r.id)                        AS families_registered,
-                COALESCE(SUM(DISTINCT r.persons), 0)        AS persons_registered,
-                COALESCE(SUM(DISTINCT r.paid), 0)           AS collection,
-                COUNT(DISTINCT a.id)                        AS families_scanned,
-                COALESCE(SUM(a.persons), 0)                 AS persons_scanned
+                COALESCE(reg.families_registered, 0) AS families_registered,
+                COALESCE(reg.persons_registered, 0)  AS persons_registered,
+                COALESCE(reg.collection, 0)          AS collection,
+                COALESCE(reg.token_total, 0)         AS token_total,
+                COALESCE(reg.aarti_total, 0)         AS aarti_total,
+                COALESCE(reg.abhishek_total, 0)      AS abhishek_total,
+                COALESCE(reg.donation_total, 0)      AS donation_total,
+                COALESCE(att.families_scanned, 0)    AS families_scanned,
+                COALESCE(att.persons_scanned, 0)     AS persons_scanned,
+                COALESCE(sett.submitted, 0)          AS submitted
             FROM users u
-            LEFT JOIN registrations r ON r.registered_by = u.id
-            LEFT JOIN attendance a ON a.scanned_by = u.id
-            GROUP BY u.id
+            LEFT JOIN (
+                SELECT registered_by,
+                       COUNT(*)             AS families_registered,
+                       SUM(persons)         AS persons_registered,
+                       SUM(paid)            AS collection,
+                       SUM(token_amount)    AS token_total,
+                       SUM(aarti_amount)    AS aarti_total,
+                       SUM(abhishek_amount) AS abhishek_total,
+                       SUM(donation_amount) AS donation_total
+                FROM registrations
+                GROUP BY registered_by
+            ) reg ON reg.registered_by = u.id
+            LEFT JOIN (
+                SELECT scanned_by, COUNT(*) AS families_scanned, SUM(persons) AS persons_scanned
+                FROM attendance
+                GROUP BY scanned_by
+            ) att ON att.scanned_by = u.id
+            LEFT JOIN (
+                SELECT volunteer_id, SUM(amount) AS submitted
+                FROM settlements
+                GROUP BY volunteer_id
+            ) sett ON sett.volunteer_id = u.id
             ORDER BY collection DESC, families_scanned DESC
         """)
         for row in rows:
-            row['families_registered'] = int(row['families_registered'])
-            row['persons_registered']  = int(row['persons_registered'])
-            row['collection']          = int(row['collection'])
-            row['families_scanned']     = int(row['families_scanned'])
-            row['persons_scanned']      = int(row['persons_scanned'])
+            for key in ('families_registered', 'persons_registered', 'collection', 'token_total',
+                        'aarti_total', 'abhishek_total', 'donation_total', 'families_scanned',
+                        'persons_scanned', 'submitted'):
+                row[key] = int(row[key])
+            row['balance_due'] = row['collection'] - row['submitted']
         return jsonify({'user_stats': rows})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -472,10 +630,23 @@ def my_stats():
     try:
         uid = session['user_id']
         row = db_query("""
-            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons
+            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons,
+                   COALESCE(SUM(paid),0) AS collection
             FROM registrations WHERE registered_by = %s
         """, (uid,), fetch='one')
-        return jsonify({'families': row['families'], 'persons': int(row['persons'])})
+        sett_row = db_query(
+            "SELECT COALESCE(SUM(amount),0) AS submitted FROM settlements WHERE volunteer_id = %s",
+            (uid,), fetch='one'
+        )
+        collection = int(row['collection'])
+        submitted = int(sett_row['submitted'])
+        return jsonify({
+            'families': row['families'],
+            'persons': int(row['persons']),
+            'collection': collection,
+            'submitted': submitted,
+            'balance_due': collection - submitted,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -519,8 +690,14 @@ def register_family():
     mobile     = str(data.get('mobile', '')).strip()
     persons    = int(data.get('persons', 1))
     free_entry = bool(data.get('free_entry', False))
-    paid       = 0 if free_entry else int(data.get('paid', 0))
     registered_by = session['user_id']
+
+    try:
+        aarti_amount    = max(0, int(data.get('aarti_amount', 0) or 0))
+        abhishek_amount = max(0, int(data.get('abhishek_amount', 0) or 0))
+        donation_amount = max(0, int(data.get('donation_amount', 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Aarti, Abhishek and Donation amounts must be whole numbers'}), 400
 
     if not name or not address or not mobile:
         return jsonify({'error': 'Name, address, and mobile number are required'}), 400
@@ -528,8 +705,12 @@ def register_family():
         return jsonify({'error': 'Mobile number must be 10 digits'}), 400
     if persons < 1 or persons > 50:
         return jsonify({'error': 'Members count must be between 1 and 50'}), 400
-    if not free_entry and paid <= 0:
-        return jsonify({'error': 'Amount paid is required, or mark this registration as Free Entry'}), 400
+
+    # Token/entry amount is never trusted from the client -- it's always persons x the
+    # admin-configured rate, so the charge can't be tampered with in the request body.
+    rate = get_settings_row()['token_rate']
+    token_amount = 0 if free_entry else persons * rate
+    paid = token_amount + aarti_amount + abhishek_amount + donation_amount
 
     try:
         conn = get_db()
@@ -541,22 +722,31 @@ def register_family():
                 token = str(tok_num).zfill(3)
 
                 cur.execute("""
-                    INSERT INTO registrations (token, name, address, mobile, persons, paid, free_entry, registered_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by))
+                    INSERT INTO registrations
+                        (token, name, address, mobile, persons, paid, free_entry, registered_by,
+                         token_amount, aarti_amount, abhishek_amount, donation_amount)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by,
+                      token_amount, aarti_amount, abhishek_amount, donation_amount))
                 conn.commit()
         finally:
             conn.close()
 
-        log.info(f'Janmashtami Registration: Token={token} Name={name} Members={persons} Paid={paid} Free={free_entry}')
+        log.info(f'Janmashtami Registration: Token={token} Name={name} Members={persons} '
+                 f'Token={token_amount} Aarti={aarti_amount} Abhishek={abhishek_amount} '
+                 f'Donation={donation_amount} Total={paid} Free={free_entry}')
         return jsonify({
-            'success':    True,
-            'token':      token,
-            'name':       name,
-            'persons':    persons,
-            'paid':       paid,
-            'free_entry': free_entry,
-            'reg_at':     datetime.now().strftime('%d/%m/%Y %H:%M'),
+            'success':         True,
+            'token':           token,
+            'name':            name,
+            'persons':         persons,
+            'paid':            paid,
+            'token_amount':    token_amount,
+            'aarti_amount':    aarti_amount,
+            'abhishek_amount': abhishek_amount,
+            'donation_amount': donation_amount,
+            'free_entry':      free_entry,
+            'reg_at':          datetime.now().strftime('%d/%m/%Y %H:%M'),
         }), 201
     except Exception as e:
         log.error(f'register error: {e}')
@@ -764,6 +954,10 @@ def export_csv():
                 r.mobile,
                 r.persons AS registered_members,
                 r.paid,
+                r.token_amount,
+                r.aarti_amount,
+                r.abhishek_amount,
+                r.donation_amount,
                 r.free_entry,
                 r.reg_at,
                 COALESCE(u.name, 'Unknown')   AS registered_by_user,
@@ -776,13 +970,15 @@ def export_csv():
             ORDER BY r.id ASC
         """)
 
-        lines = ['Token,Family Head,Address,Mobile,Registered Members,Paid (Rs),Free Entry,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
+        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Free Entry,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
             addr   = str(r['address']).replace(',', ';').replace('\n', ' ')
             reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
             lines.append(
                 f"{r['token']},{r['name']},{addr},{r['mobile']},"
-                f"{r['registered_members']},{r['paid']},{'Yes' if r['free_entry'] else 'No'},"
+                f"{r['registered_members']},{r['token_amount']},{r['aarti_amount']},"
+                f"{r['abhishek_amount']},{r['donation_amount']},{r['paid']},"
+                f"{'Yes' if r['free_entry'] else 'No'},"
                 f"{reg_at},{r['registered_by_user']},"
                 f"{r['attended']},{r['members_counted']},{r['gate_time']}"
             )

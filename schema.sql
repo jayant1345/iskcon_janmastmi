@@ -24,16 +24,20 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ── FAMILY REGISTRATIONS TABLE ──
 CREATE TABLE IF NOT EXISTS registrations (
-    id            INT AUTO_INCREMENT PRIMARY KEY,
-    token         VARCHAR(10)  NOT NULL UNIQUE,   -- e.g. 001, 002, 003
-    name          VARCHAR(150) NOT NULL,           -- Family head name
-    address       TEXT         NOT NULL,           -- Full address
-    mobile        VARCHAR(15)  NOT NULL,           -- 10-digit mobile
-    persons       INT          NOT NULL DEFAULT 1, -- Number of family members
-    paid          INT          NOT NULL DEFAULT 0, -- Amount paid (Rs)
-    free_entry    TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag
-    registered_by INT          NULL,               -- FK to users.id
-    reg_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    token            VARCHAR(10)  NOT NULL UNIQUE,   -- e.g. 001, 002, 003
+    name             VARCHAR(150) NOT NULL,           -- Family head name
+    address          TEXT         NOT NULL,           -- Full address
+    mobile           VARCHAR(15)  NOT NULL,           -- 10-digit mobile
+    persons          INT          NOT NULL DEFAULT 1, -- Number of family members
+    paid             INT          NOT NULL DEFAULT 0, -- Total amount (token + aarti + abhishek + donation)
+    token_amount     INT          NOT NULL DEFAULT 0, -- persons x settings.token_rate at time of booking
+    aarti_amount     INT          NOT NULL DEFAULT 0, -- Optional Aarti seva amount
+    abhishek_amount  INT          NOT NULL DEFAULT 0, -- Optional Abhishek seva amount
+    donation_amount  INT          NOT NULL DEFAULT 0, -- Optional donation, 80G receipt issued separately
+    free_entry       TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag (zeroes token_amount only)
+    registered_by    INT          NULL,               -- FK to users.id
+    reg_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_token (token),
     INDEX idx_mobile (mobile),
     INDEX idx_reg_by (registered_by)
@@ -71,6 +75,29 @@ CREATE TABLE IF NOT EXISTS attendance_log (
     scan_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_token (token),
     INDEX idx_scan_time (scan_time)
+) ENGINE=InnoDB CHARACTER SET utf8mb4;
+
+-- ── SETTINGS TABLE ── (admin-adjustable pricing, single row)
+CREATE TABLE IF NOT EXISTS settings (
+    id             INT PRIMARY KEY DEFAULT 1,
+    token_rate     INT NOT NULL DEFAULT 20,   -- Rs per person entry token charge
+    aarti_price    INT NOT NULL DEFAULT 101,  -- Suggested Aarti seva price
+    abhishek_price INT NOT NULL DEFAULT 251,  -- Suggested Abhishek seva price
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO settings (id, token_rate, aarti_price, abhishek_price) VALUES (1, 20, 101, 251);
+
+-- ── SETTLEMENTS TABLE ── (volunteer cash/UPI collected, remitted to central admin)
+CREATE TABLE IF NOT EXISTS settlements (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    volunteer_id INT          NOT NULL,
+    amount       INT          NOT NULL,
+    note         VARCHAR(255) NULL,
+    recorded_by  INT          NULL,          -- admin who recorded the remittance
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (volunteer_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_volunteer (volunteer_id)
 ) ENGINE=InnoDB CHARACTER SET utf8mb4;
 
 SELECT 'ISKCON Janmashtami DB schema created successfully!' AS status;

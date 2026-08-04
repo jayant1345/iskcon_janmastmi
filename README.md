@@ -57,14 +57,20 @@ Designed with modern UI principles inspired by **Stitch**:
 - **Instant Printable QR Card**: Generates a dynamic QR code token card for printing or downloading.
 - **One-Tap WhatsApp Delivery**: Agents can send the family's token details directly to the registered mobile number via WhatsApp (`wa.me` deep link) immediately after downloading the QR image to attach.
 
-### 🚪 3. Gate Entry & QR Attendance Scanning
+### 💰 3. Configurable Pricing & Donations
+- **Admin-Adjustable Token Rate**: Per-person entry charge is set centrally by the admin (Volunteers & Admin → Pricing Settings) and applied automatically — volunteers never type it in, so it can't be tampered with per booking.
+- **Aarti / Abhishek Seva**: Optional facilities a family can opt into at booking time, with admin-configured suggested prices that the volunteer can override per family.
+- **Donations (80G)**: A separate optional donation amount, tracked distinctly from the entry/seva charges so it can be exported later for 80G tax-exemption receipt preparation.
+- **Volunteer Settlement Tracking**: Every volunteer's total collection (cash/UPI they've received from families) is tracked against what they've formally remitted to the central admin, with a running balance-due shown on both the admin leaderboard and the volunteer's own dashboard.
+
+### 🚪 4. Gate Entry & QR Attendance Scanning
 - **Integrated Camera Scanner**: Scans QR codes using device webcam/camera.
 - **Smart Duplicate Entry Handling**: Detects prior gate scans, displays timestamp of original entry, and allows logging extra family members arriving separately.
-- **Hourly Gate Traffic**: Visual flow chart tracking attendee volume from 8 AM to 9 PM.
+- **Hourly Gate Traffic**: Visual flow chart tracking attendee volume across the full event window (afternoon through midnight).
 
-### 📊 4. Analytics & Reports
+### 📊 5. Analytics & Reports
 - **Real-Time Dashboard**: Monitors total registered families, total registered devotees, checked-in families, devotees inside, and pending arrivals.
-- **CSV Data Export**: One-click export of complete registration & gate logs as a clean `.csv` file.
+- **CSV Data Export**: One-click export of complete registration & gate logs, including the token/aarti/abhishek/donation breakdown, as a clean `.csv` file.
 
 ---
 
@@ -95,13 +101,15 @@ iskcon_janmastmi/
 
 ## 🗄️ Database Schema
 
-The database `iskcon_janmastmi_db` consists of 5 main tables:
+The database `iskcon_janmastmi_db` consists of 7 main tables:
 
 1. **`users`**: System users (admins and volunteer operators).
-2. **`registrations`**: Family registration records with token, contact info, member count, payment status, and creator ID.
+2. **`registrations`**: Family registration records with token, contact info, member count, and a payment breakdown (token/aarti/abhishek/donation amounts plus the total `paid`).
 3. **`attendance`**: One row per token with the current total persons checked in (used for duplicate-scan detection).
 4. **`attendance_log`**: One row per scan event (initial entry + each "add more arriving separately"), used to compute accurate hourly footfall.
 5. **`token_counter`**: Single-row tracking table managing auto-incrementing token numbers.
+6. **`settings`**: Single-row table holding the admin-adjustable token rate and suggested Aarti/Abhishek prices.
+7. **`settlements`**: Log of cash/UPI amounts each volunteer has formally remitted to the central admin, used to compute their outstanding balance due.
 
 ---
 
@@ -191,15 +199,24 @@ Admins can create additional volunteer accounts through the Admin tab.
 
 ### Registration & Gate Scan
 - `GET /api/registrations` — Fetch all registrations
-- `POST /api/register` — Register family and generate token
+- `POST /api/register` — Register family and generate token (server computes token/aarti/abhishek/donation total)
 - `POST /api/gate/scan` — Process QR token gate entry & update attendee counts
 - `GET /api/attendance` — Fetch gate attendance log
-- `GET /api/attendance/hourly` — Get hourly attendee flow data
+- `GET /api/attendance/hourly` — Get hourly attendee flow data (12 PM–12 AM)
+
+### Pricing Settings
+- `GET /api/settings` — Current token rate and suggested Aarti/Abhishek prices
+- `PUT /api/admin/settings` — Update token rate and suggested prices (Admin only)
+
+### Volunteer Settlements
+- `GET /api/admin/settlements` — List all cash/UPI remittances recorded for volunteers (Admin only)
+- `POST /api/admin/settlements` — Record a volunteer's remittance to the central admin (Admin only)
+- `GET /api/my-stats` — A volunteer's own collection, submitted, and balance-due totals
 
 ### Analytics & Reports
-- `GET /api/stats` — Overall registration & attendance counts
-- `GET /api/admin/user-stats` — Volunteer leaderboard and collection stats
-- `GET /api/export/csv` — Export complete CSV report
+- `GET /api/stats` — Overall registration & attendance counts (admin view includes collection breakdown)
+- `GET /api/admin/user-stats` — Volunteer leaderboard with collection, submitted, and balance-due stats
+- `GET /api/export/csv` — Export complete CSV report including the fee breakdown
 - `POST /api/admin/clear` — Reset registration & attendance records (Admin only)
 
 ---
