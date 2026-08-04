@@ -1150,25 +1150,27 @@
   <!-- ── TOKEN PRINT / QR MODAL ── -->
   <div id="token-modal" class="modal-overlay">
     <div class="token-card">
-      <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Janmashtami 2026</h4>
-      <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">DEVOTEE ENTRY PASS</h2>
-      
-      <div class="token-number" id="modal-token-num">001</div>
-      <h3 id="modal-name" style="color: white; font-size: 1.2rem;">Devotee Name</h3>
-      <p id="modal-details" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;"></p>
+      <div id="invitation-capture-area" style="background: var(--bg-card, #0B132B); padding: 0.5rem;">
+        <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Janmashtami 2026</h4>
+        <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">DEVOTEE ENTRY PASS</h2>
 
-      <div class="qr-container">
-        <div id="modal-qrcode"></div>
+        <div class="token-number" id="modal-token-num">001</div>
+        <h3 id="modal-name" style="color: white; font-size: 1.2rem;">Devotee Name</h3>
+        <p id="modal-details" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;"></p>
+
+        <div class="qr-container">
+          <div id="modal-qrcode"></div>
+        </div>
       </div>
 
       <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
         <button class="btn-primary" style="background: #25D366; color: white;" onclick="sendViaWhatsApp()"><i class="fa-brands fa-whatsapp"></i> Send via WhatsApp</button>
-        <button class="btn-primary" onclick="downloadQRImage()"><i class="fa-solid fa-download"></i> Download QR</button>
+        <button class="btn-primary" onclick="downloadInvitationCard()"><i class="fa-solid fa-download"></i> Download Invitation</button>
         <button class="btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>
         <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closeModal()">Close</button>
       </div>
       <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.6rem;">
-        <i class="fa-solid fa-circle-info"></i> WhatsApp can't auto-attach the QR image via link &mdash; clicking "Send via WhatsApp" downloads the QR first, then opens the chat so you can attach it manually.
+        <i class="fa-solid fa-circle-info"></i> WhatsApp can't auto-attach an image via link &mdash; clicking "Send via WhatsApp" downloads the full invitation card first, then opens the chat so you can attach it manually.
       </p>
     </div>
   </div>
@@ -1591,34 +1593,116 @@
       document.getElementById('token-modal').classList.remove('active');
     }
 
-    function getQRCanvas() {
-      const qrContainer = document.getElementById('modal-qrcode');
-      return qrContainer.querySelector('canvas');
+    function roundRectPath(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
     }
 
-    function downloadQRImage() {
-      if (!currentTokenData) return;
-      const canvas = getQRCanvas();
-      if (!canvas) { alert('QR code not ready yet.'); return; }
+    // Composed manually on a canvas (title/token/name/breakdown text + the QR canvas's
+    // own pixels drawn in directly) instead of via html2canvas -- html2canvas silently
+    // renders the QR canvas as a blank white square for this QR library, so a DOM
+    // screenshot approach loses the QR code entirely.
+    async function buildInvitationCanvas() {
+      const data = currentTokenData;
+      const qrCanvas = document.querySelector('#modal-qrcode canvas');
+      if (!data || !qrCanvas) return null;
+
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch (e) { /* fall through with default fonts */ }
+      }
+
+      const scale = 2;
+      const W = 640;
+      const pad = 36;
+      const qrSize = 240;
+
+      const rows = [
+        { text: 'ISKCON JANMASHTAMI 2026', font: '700 15px Outfit, sans-serif', color: '#06B6D4', h: 26 },
+        { text: 'DEVOTEE ENTRY PASS', font: '800 26px Outfit, sans-serif', color: '#FFFFFF', h: 40 },
+        { type: 'tokenBox', text: data.token, h: 100 },
+        { text: data.name, font: '700 24px Outfit, sans-serif', color: '#FFFFFF', h: 36 },
+        { text: `${data.persons} Family Member(s)`, font: '500 16px Inter, sans-serif', color: '#94A3B8', h: 24 },
+        ...amountBreakdownLines(data).map(line => ({ text: line, font: '500 15px Inter, sans-serif', color: '#94A3B8', h: 22 })),
+        { type: 'qr', h: qrSize + 20 },
+      ];
+
+      const topPad = 34, bottomPad = 34, rowGap = 6;
+      let totalH = topPad + bottomPad;
+      rows.forEach(r => { totalH += r.h + rowGap; });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W * scale;
+      canvas.height = totalH * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      ctx.fillStyle = '#0B132B';
+      ctx.fillRect(0, 0, W, totalH);
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, W - 2, totalH - 2);
+
+      let y = topPad;
+      rows.forEach(r => {
+        if (r.type === 'tokenBox') {
+          const grad = ctx.createLinearGradient(pad, y, W - pad, y);
+          grad.addColorStop(0, '#F59E0B');
+          grad.addColorStop(1, '#D97706');
+          ctx.fillStyle = grad;
+          ctx.fillRect(pad, y, W - pad * 2, r.h);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '800 56px Outfit, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2 + 2);
+        } else if (r.type === 'qr') {
+          const qrX = (W - qrSize) / 2;
+          ctx.fillStyle = '#FFFFFF';
+          roundRectPath(ctx, qrX - 10, y, qrSize + 20, qrSize + 20, 12);
+          ctx.fill();
+          ctx.drawImage(qrCanvas, qrX, y + 10, qrSize, qrSize);
+        } else {
+          ctx.fillStyle = r.color;
+          ctx.font = r.font;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2);
+        }
+        y += r.h + rowGap;
+      });
+
+      return canvas;
+    }
+
+    async function downloadInvitationCard() {
+      if (!currentTokenData) return null;
+      const canvas = await buildInvitationCanvas();
+      if (!canvas) { alert('Could not generate the invitation card image.'); return null; }
       const link = document.createElement('a');
-      link.download = `ISKCON_Token_${currentTokenData.token}.png`;
+      link.download = `ISKCON_Invitation_${currentTokenData.token}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
+      return canvas;
     }
 
     function buildWhatsAppMessage(data) {
       const breakdown = amountBreakdownLines(data).join('\n');
-      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached QR code image handy and show it at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
+      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached invitation card image handy and show its QR code at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
     }
 
-    function sendViaWhatsApp() {
+    async function sendViaWhatsApp() {
       if (!currentTokenData) return;
       const mobile = String(currentTokenData.mobile || '').trim();
       if (!/^\d{10}$/.test(mobile)) {
         alert('No valid 10-digit mobile number on this registration to message.');
         return;
       }
-      downloadQRImage();
+      await downloadInvitationCard();
       const message = buildWhatsAppMessage(currentTokenData);
       const waUrl = `https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
