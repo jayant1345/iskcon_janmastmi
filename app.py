@@ -586,19 +586,35 @@ def list_attendance():
 @login_required
 def hourly_attendance():
     try:
+        # Janmashtami runs afternoon through midnight (Krishna's birth is marked at 00:00,
+        # with the function continuing to ~00:30). A plain DATE(scan_time) = CURDATE() filter
+        # would drop everything scanned after midnight, since those rows carry tomorrow's
+        # calendar date. Shifting by 6 hours before comparing keeps the whole afternoon->past-
+        # midnight window on one logical "event day".
         rows = db_query("""
             SELECT HOUR(scan_time) AS hr, COUNT(DISTINCT token) AS families, SUM(persons) AS persons
             FROM attendance_log
-            WHERE DATE(scan_time) = CURDATE()
+            WHERE DATE(DATE_SUB(scan_time, INTERVAL 6 HOUR)) = DATE(DATE_SUB(NOW(), INTERVAL 6 HOUR))
             GROUP BY HOUR(scan_time)
             ORDER BY hr
         """)
-        slots = {h: {'families': 0, 'persons': 0} for h in range(8, 22)}
-        for row in rows:
-            h = int(row['hr'])
-            if h in slots:
-                slots[h] = {'families': int(row['families']), 'persons': int(row['persons'])}
-        return jsonify({'hourly': slots})
+        counts = {int(r['hr']): {'families': int(r['families']), 'persons': int(r['persons'])} for r in rows}
+
+        event_hours = list(range(12, 24)) + [0]  # 12 PM ... 11 PM, then 12 AM (midnight)
+        hourly = []
+        for h in event_hours:
+            if h == 12:
+                label = '12 PM'
+            elif h == 0:
+                label = '12 AM'
+            elif h > 12:
+                label = f'{h - 12} PM'
+            else:
+                label = f'{h} AM'
+            slot = counts.get(h, {'families': 0, 'persons': 0})
+            hourly.append({'hour': h, 'label': label, 'families': slot['families'], 'persons': slot['persons']})
+
+        return jsonify({'hourly': hourly})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
