@@ -966,13 +966,16 @@
               <div id="scan-result-badge" class="badge" style="margin-bottom: 0.5rem;"></div>
               <h3 id="scan-result-name" style="font-size: 1.4rem; color: white;">Devotee Name</h3>
               <p id="scan-result-details" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;"></p>
-              
-              <div id="scan-add-more-container" class="hidden" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                <label class="form-label">Add remaining arriving family members:</label>
+
+              <div id="scan-confirm-container" class="hidden" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <label class="form-label" id="scan-confirm-label">How many are entering now?</label>
                 <div style="display: flex; gap: 0.5rem;">
-                  <input type="number" id="scan-extra-persons" class="form-control" value="1" min="1" max="10" style="width: 100px;">
-                  <button type="button" class="btn-primary" style="width: auto;" onclick="addExtraMembers()">Add Members</button>
+                  <input type="number" id="scan-confirm-persons" class="form-control" value="1" min="1" style="width: 100px;">
+                  <button type="button" class="btn-primary" style="width: auto;" onclick="confirmGateEntry()">
+                    <i class="fa-solid fa-door-open"></i> Confirm Entry
+                  </button>
                 </div>
+                <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.5rem;">Partial arrivals are fine &mdash; scan the same QR again later to let the rest of the family in.</p>
               </div>
             </div>
           </div>
@@ -1744,66 +1747,104 @@
       if (token) processTokenCheck(token);
     });
 
-    async function processTokenCheck(token, addMore = false, extraPersons = 0) {
-      currentScannedToken = token;
-      try {
-        const payload = { token };
-        if (addMore) {
-          payload.add_more = true;
-          payload.persons = extraPersons;
-        }
+    let currentLookup = null;
 
-        const res = await fetch(`${API_BASE}/api/gate/scan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
-        });
+    async function processTokenCheck(token) {
+      currentScannedToken = token;
+      const card = document.getElementById('scan-result-card');
+      const badge = document.getElementById('scan-result-badge');
+      const nameEl = document.getElementById('scan-result-name');
+      const detEl = document.getElementById('scan-result-details');
+      const confirmContainer = document.getElementById('scan-confirm-container');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/gate/lookup?token=${encodeURIComponent(token)}`, { credentials: 'include' });
         const data = await res.json();
-        const card = document.getElementById('scan-result-card');
-        const badge = document.getElementById('scan-result-badge');
-        const nameEl = document.getElementById('scan-result-name');
-        const detEl = document.getElementById('scan-result-details');
-        const addContainer = document.getElementById('scan-add-more-container');
 
         card.classList.remove('hidden');
-        addContainer.classList.add('hidden');
+        confirmContainer.classList.add('hidden');
 
-        if (data.status === 'success') {
-          playChimeSound();
-          document.getElementById('manual-token').value = data.token;
-          badge.className = 'badge badge-success';
-          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> GATE ENTRY GRANTED';
-          nameEl.textContent = data.name;
-          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> <strong>${data.persons} Devotee(s)</strong> Checked-in at <strong>${data.gate_time}</strong>`;
-          loadDashboardStats();
-          loadAttendanceLog();
-        } else if (data.status === 'duplicate') {
+        if (data.status !== 'found') {
           playWarningSound();
-          document.getElementById('manual-token').value = data.token;
-          badge.className = 'badge badge-warning';
-          badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ALREADY CHECKED-IN AT GATE';
-          nameEl.textContent = data.name;
-          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem;">Token #${data.token}</span> Initial entry logged at ${data.gate_time}. Inside: ${data.persons}/${data.registered} Devotees.`;
-          if (data.remaining > 0) {
-            addContainer.classList.remove('hidden');
-          }
-        } else {
-          playWarningSound();
+          currentLookup = null;
           badge.className = 'badge badge-danger';
           badge.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> TOKEN NOT FOUND';
           nameEl.textContent = 'Invalid Token / Search';
           detEl.textContent = data.message || 'Token not found in registration database.';
+          return;
         }
+
+        currentLookup = data;
+        document.getElementById('manual-token').value = data.token;
+
+        if (data.remaining <= 0) {
+          badge.className = 'badge badge-warning';
+          badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> FULLY CHECKED IN';
+          nameEl.textContent = data.name;
+          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem;">Token #${data.token}</span> All ${data.registered}/${data.registered} family member(s) already inside (last entry at ${data.gate_time}).`;
+          return;
+        }
+
+        badge.className = 'badge badge-success';
+        badge.innerHTML = data.already_in > 0
+          ? '<i class="fa-solid fa-user-clock"></i> PARTIALLY CHECKED IN'
+          : '<i class="fa-solid fa-circle-check"></i> READY TO ENTER';
+        nameEl.textContent = data.name;
+        detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> Registered: <strong>${data.registered}</strong> | Already inside: <strong>${data.already_in}</strong> | Remaining: <strong>${data.remaining}</strong>`;
+
+        document.getElementById('scan-confirm-label').textContent = data.already_in > 0
+          ? 'How many more are entering now?'
+          : 'How many are entering now?';
+        const personsInput = document.getElementById('scan-confirm-persons');
+        personsInput.value = data.remaining;
+        personsInput.max = data.remaining;
+        confirmContainer.classList.remove('hidden');
       } catch (err) {
-        alert('Scan verification error');
+        alert('Scan lookup error');
       }
     }
 
-    function addExtraMembers() {
-      const count = parseInt(document.getElementById('scan-extra-persons').value || 1);
-      if (currentScannedToken) {
-        processTokenCheck(currentScannedToken, true, count);
+    async function confirmGateEntry() {
+      if (!currentLookup) return;
+      const count = parseInt(document.getElementById('scan-confirm-persons').value || 0);
+      if (!count || count <= 0) {
+        alert('Enter a valid number of people entering now.');
+        return;
+      }
+      if (count > currentLookup.remaining) {
+        alert(`Only ${currentLookup.remaining} member(s) remain for this family.`);
+        return;
+      }
+
+      const addMore = currentLookup.already_in > 0;
+      try {
+        const res = await fetch(`${API_BASE}/api/gate/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ token: currentLookup.token, persons: count, add_more: addMore })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          playChimeSound();
+          const badge = document.getElementById('scan-result-badge');
+          const nameEl = document.getElementById('scan-result-name');
+          const detEl = document.getElementById('scan-result-details');
+          badge.className = 'badge badge-success';
+          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> GATE ENTRY GRANTED';
+          nameEl.textContent = data.name;
+          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> <strong>${count} Devotee(s)</strong> checked in just now. Total inside: <strong>${data.persons}</strong>.`;
+          document.getElementById('scan-confirm-container').classList.add('hidden');
+          loadDashboardStats();
+          loadAttendanceLog();
+        } else {
+          // State likely changed since lookup (e.g. another gate scanned this token) -- resync.
+          playWarningSound();
+          await processTokenCheck(currentLookup.token);
+        }
+      } catch (err) {
+        alert('Gate entry error');
       }
     }
 

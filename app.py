@@ -846,6 +846,42 @@ def search_gate_tokens():
         log.error(f'search_gate_tokens error: {e}')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/gate/lookup', methods=['GET'])
+@login_required
+def gate_lookup():
+    """Read-only lookup used by the scan UI to show a confirm-before-entry screen,
+    so gate staff can edit how many of the family are actually here right now --
+    on the very first scan, not just on repeat scans for latecomers."""
+    token_input = str(request.args.get('token', '')).strip()
+    if not token_input:
+        return jsonify({'error': 'Token is required'}), 400
+    try:
+        reg = db_query("SELECT * FROM registrations WHERE token = %s OR mobile = %s", (token_input, token_input), fetch='one')
+        if not reg:
+            return jsonify({'status': 'not_found', 'message': f'No registration found for token or mobile number "{token_input}".'}), 404
+
+        existing = db_query("SELECT * FROM attendance WHERE token = %s", (reg['token'],), fetch='one')
+        registered_total = reg['persons']
+        already_in = existing['persons'] if existing else 0
+        remaining = max(0, registered_total - already_in)
+        gate_time = existing['gate_time'] if existing else None
+        if gate_time and hasattr(gate_time, 'strftime'):
+            gate_time = gate_time.strftime('%H:%M')
+
+        return jsonify({
+            'status': 'found',
+            'token': reg['token'],
+            'name': reg['name'],
+            'mobile': reg['mobile'],
+            'registered': registered_total,
+            'already_in': already_in,
+            'remaining': remaining,
+            'gate_time': gate_time,
+        })
+    except Exception as e:
+        log.error(f'gate_lookup error: {e}')
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/gate/scan', methods=['POST'])
 @login_required
 def gate_scan():
@@ -873,7 +909,9 @@ def gate_scan():
 
         token = reg['token']
         actual_name = reg['name']
-        actual_persons = persons if persons > 0 else reg['persons']
+        # Never let a client-supplied count push the checked-in total past what the
+        # family actually registered for.
+        actual_persons = min(persons, reg['persons']) if persons > 0 else reg['persons']
         actual_paid = reg['paid']
         actual_mobile = reg['mobile']
 
@@ -887,6 +925,7 @@ def gate_scan():
             remaining = max(0, registered_total - already_in)
 
             if persons > 0 and data.get('add_more'):
+                persons = min(persons, remaining)
                 new_total = already_in + persons
                 db_execute("UPDATE attendance SET persons = %s WHERE token = %s", (new_total, token))
                 db_execute(
