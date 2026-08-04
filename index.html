@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪈 ISKCON Janmashtami 2026 — Devotee Gathering & Entry Gateway</title>
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- QRCode JS Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- HTML5 QR Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    :root {
+      --bg-dark: #030D22;
+      --bg-card: rgba(8, 28, 62, 0.75);
+      --bg-card-hover: rgba(12, 43, 94, 0.85);
+      --border-gold: rgba(251, 191, 36, 0.35);
+      --border-peacock: rgba(0, 229, 255, 0.3);
+      --border-feather: rgba(168, 85, 247, 0.35);
+      
+      --accent-gold: #F59E0B;
+      --accent-gold-light: #FBBF24;
+      --accent-peacock: #00E5FF;
+      --accent-peacock-teal: #0D9488;
+      --accent-emerald: #10B981;
+      --accent-magenta: #E056FD;
+      --accent-purple: #A855F7;
+
+      --grad-morpankh: linear-gradient(135deg, #00E5FF 0%, #0072FF 40%, #A855F7 80%, #EC4899 100%);
+      --grad-gold: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+      --grad-peacock-btn: linear-gradient(135deg, #00C6FF 0%, #0072FF 50%, #7C3AED 100%);
+
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --glass-shadow: 0 20px 40px rgba(0, 229, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: #030D22;
+      background-image: linear-gradient(180deg, rgba(3, 13, 34, 0.35) 0%, rgba(2, 6, 23, 0.60) 100%), url('dancing_peacock.jpg');
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    h1, h2, h3, h4, .font-heading {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* ── HEADER & NAVIGATION ── */
+    .header-nav {
+      background: rgba(3, 13, 34, 0.94);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-peacock);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      box-shadow: 0 4px 30px rgba(0, 229, 255, 0.15);
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .brand-icon {
+      width: 46px;
+      height: 46px;
+      background: var(--grad-morpankh);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: #030D22;
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.6);
+    }
+
+    .brand-text h1 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #FFF 0%, #00E5FF 50%, #FBBF24 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--accent-peacock);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(8, 28, 62, 0.7);
+      padding: 0.35rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-peacock);
+      flex-wrap: wrap;
+      max-width: 100%;
+    }
+
+    .nav-tab {
+      padding: 0.45rem 0.85rem;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.83rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      white-space: nowrap;
+      transition: all 0.3s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--accent-peacock);
+      background: rgba(0, 229, 255, 0.08);
+    }
+
+    .nav-tab.active {
+      background: var(--grad-morpankh);
+      color: #030D22;
+      font-weight: 700;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(8, 28, 62, 0.8);
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      border: 1px solid var(--border-peacock);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .role-tag {
+      padding: 0.15rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .role-admin { background: linear-gradient(135deg, #EF4444, #DC2626); color: white; }
+    .role-user { background: var(--accent-peacock); color: #030D22; }
+
+    .btn-logout {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.35) 100%);
+      color: #FFF;
+      border: 1px solid rgba(239, 68, 68, 0.6);
+      padding: 0.45rem 0.9rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex !important;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      white-space: nowrap;
+      transition: all 0.25s;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-logout:hover {
+      background: #EF4444;
+      color: white;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    /* ── DANCING PEACOCK HERO BANNER ── */
+    .peacock-hero-banner {
+      position: relative;
+      width: 100%;
+      height: 180px;
+      border-radius: 20px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-peacock);
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.25);
+    }
+
+    .peacock-hero-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;
+    }
+
+    .peacock-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(3, 13, 34, 0.85) 0%, rgba(3, 13, 34, 0.35) 50%, rgba(3, 13, 34, 0.15) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 2rem;
+    }
+
+    .peacock-hero-overlay h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #FFF 0%, #00E5FF 50%, #FBBF24 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .peacock-hero-overlay p {
+      color: var(--accent-peacock);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+    }
+
+    /* ── LIVE SEARCH AUTOCOMPLETE DROPDOWN ── */
+    .autocomplete-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: rgba(3, 13, 34, 0.98);
+      backdrop-filter: blur(30px);
+      border: 2px solid var(--accent-peacock);
+      border-radius: 16px;
+      box-shadow: 0 15px 50px rgba(0, 229, 255, 0.4);
+      z-index: 999999 !important;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .autocomplete-item {
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .autocomplete-item:hover {
+      background: rgba(0, 229, 255, 0.18);
+    }
+
+    /* ── MOBILE RESPONSIVENESS ── */
+    @media (max-width: 900px) {
+      body {
+        background-attachment: scroll;
+      }
+      .header-nav {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem 0.85rem;
+      }
+      .brand-text h1 {
+        font-size: 1.1rem;
+      }
+      .brand-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 1.2rem;
+      }
+      .nav-tabs {
+        overflow-x: auto;
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.35rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .nav-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .nav-tab {
+        white-space: nowrap;
+        padding: 0.45rem 0.8rem;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+      }
+      .user-profile {
+        justify-content: space-between;
+        width: 100%;
+        padding-top: 0.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .user-badge {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.78rem;
+      }
+      .btn-logout {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.78rem;
+      }
+      .app-container {
+        padding: 0 0.6rem;
+        margin: 1rem auto;
+      }
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+      }
+      .stat-card {
+        padding: 1rem;
+      }
+      .stat-value {
+        font-size: 1.6rem;
+      }
+      .stat-icon {
+        font-size: 1.8rem;
+        right: 0.5rem;
+        bottom: 0.5rem;
+      }
+      .peacock-hero-banner {
+        height: 120px;
+        border-radius: 16px;
+      }
+      .peacock-hero-overlay {
+        padding: 0 1rem;
+      }
+      .peacock-hero-overlay h2 {
+        font-size: 1.05rem;
+      }
+      .peacock-hero-overlay p {
+        font-size: 0.72rem;
+      }
+      .glass-card {
+        padding: 1rem;
+        border-radius: 16px;
+      }
+      .glass-card-title {
+        font-size: 1.05rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      .form-control {
+        font-size: 16px;
+      }
+      .token-card {
+        padding: 1.5rem 1rem;
+        max-width: 92vw;
+      }
+      .token-number {
+        font-size: 2.8rem;
+      }
+    }
+
+    /* ── CONTAINER MAIN ── */
+    .app-container {
+      max-width: 1280px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* ── CARD COMPONENTS ── */
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-peacock);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: var(--glass-shadow);
+      margin-bottom: 1.5rem;
+      position: relative;
+      overflow: visible !important;
+    }
+
+    .glass-card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent-peacock);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: linear-gradient(145deg, rgba(8, 28, 62, 0.9), rgba(3, 13, 34, 0.95));
+      border: 1px solid var(--border-peacock);
+      border-radius: 18px;
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent-peacock);
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.25);
+    }
+
+    .stat-icon {
+      position: absolute;
+      right: 1rem;
+      bottom: 1rem;
+      font-size: 2.7rem;
+      opacity: 0.15;
+      color: var(--accent-peacock);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: white;
+      margin: 0.4rem 0;
+      line-height: 1;
+    }
+
+    .stat-subtext {
+      font-size: 0.75rem;
+      color: var(--accent-peacock);
+      font-weight: 600;
+    }
+
+    /* ── FORMS ── */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      background: rgba(3, 13, 34, 0.7);
+      border: 1px solid var(--border-peacock);
+      border-radius: 12px;
+      color: white;
+      font-size: 0.95rem;
+      transition: all 0.25s ease;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent-peacock);
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+    }
+
+    .counter-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .counter-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--border-peacock);
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--accent-peacock);
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s;
+    }
+
+    .counter-btn:hover {
+      background: var(--accent-peacock);
+      color: #030D22;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+    }
+
+    .btn-primary {
+      background: var(--grad-peacock-btn);
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.9rem 1.8rem;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.35);
+      transition: all 0.25s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(0, 229, 255, 0.6);
+    }
+
+    /* ── TABLES ── */
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .custom-table th {
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--accent-gold-light);
+      text-align: left;
+      padding: 0.9rem 1rem;
+      font-weight: 700;
+      border-bottom: 2px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .custom-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #E2E8F0;
+    }
+
+    .custom-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-warning { background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    /* ── SCANNER AREA ── */
+    #qr-reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto 1.5rem;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--accent-gold);
+      background: #000;
+    }
+
+    /* ── MODALS & TOKEN CARDS ── */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(3, 7, 18, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .token-card {
+      background: linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%);
+      border: 2px solid var(--accent-gold);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 420px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.3);
+      position: relative;
+    }
+
+    .token-number {
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0.5rem 0;
+    }
+
+    .qr-container {
+      background: white;
+      padding: 1rem;
+      border-radius: 16px;
+      display: inline-block;
+      margin: 1rem 0;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    /* LOGIN SCREEN SPECIFIC */
+    .login-container {
+      max-width: 420px;
+      margin: 4rem auto;
+      width: 100%;
+      padding: 0 1rem;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-gold);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      box-shadow: var(--glass-shadow);
+      text-align: center;
+    }
+
+    .login-logo {
+      font-size: 3.5rem;
+      color: var(--accent-gold);
+      margin-bottom: 1rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── LOGIN SCREEN ── -->
+  <div id="login-view" class="login-container">
+    <div class="login-card">
+      <div class="login-logo"><img src="iskcon_logo_icon.png" alt="ISKCON Symbol" style="height: 80px; width: auto; filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.6));"></div>
+      <h2 style="font-size: 1.75rem; font-weight: 800; color: white; margin-bottom: 0.25rem;">ISKCON Janmashtami</h2>
+      <p style="color: var(--accent-peacock); font-size: 0.9rem; font-weight: 600; margin-bottom: 2rem;">Devotee Gathering & Gateway 2026</p>
+      
+      <div id="login-error" class="badge badge-danger hidden" style="width: 100%; padding: 0.6rem; margin-bottom: 1.25rem;"></div>
+
+      <form id="login-form">
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label"><i class="fa-solid fa-user"></i> Username</label>
+          <input type="text" id="login-username" class="form-control" placeholder="Enter username" required>
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label"><i class="fa-solid fa-lock"></i> Password</label>
+          <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 1.5rem;">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In to Gateway
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MAIN APP VIEW ── -->
+  <div id="app-view" class="hidden">
+    <!-- Header Nav -->
+    <header class="header-nav">
+      <div class="brand">
+        <div class="brand-icon" style="background: none; box-shadow: none;"><img src="iskcon_logo_icon.png" alt="ISKCON Symbol" style="height: 44px; width: auto; filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.6));"></div>
+        <div class="brand-text">
+          <h1>ISKCON Janmashtami 2026</h1>
+          <p>Devotee Gathering & Gate Access</p>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('dashboard')"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+        <button class="nav-tab" onclick="switchTab('register')"><i class="fa-solid fa-id-card"></i> Register Family</button>
+        <button class="nav-tab" onclick="switchTab('scan')"><i class="fa-solid fa-qrcode"></i> Gate Scan</button>
+        <button class="nav-tab" onclick="switchTab('registrations')"><i class="fa-solid fa-users"></i> Registrations</button>
+        <button class="nav-tab" onclick="switchTab('attendance')"><i class="fa-solid fa-door-open"></i> Attendance</button>
+        <button id="nav-users-tab" class="nav-tab hidden" onclick="switchTab('users')"><i class="fa-solid fa-user-gear"></i> Volunteers & Admin</button>
+      </nav>
+
+      <div class="user-profile">
+        <div class="user-badge">
+          <i class="fa-solid fa-user-circle"></i>
+          <span id="user-display-name">User</span>
+          <span id="user-role-tag" class="role-tag role-user">VOLUNTEER</span>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+      </div>
+    </header>
+
+    <main class="app-container">
+
+      <!-- ── DANCING PEACOCK HERO BANNER ── -->
+      <div class="peacock-hero-banner">
+        <img src="dancing_peacock.jpg" alt="Dancing Peacock Mor Pankh Celebration" class="peacock-hero-img">
+        <div class="peacock-hero-overlay">
+          <h2><img src="iskcon_logo_icon.png" alt="ISKCON Symbol" style="height: 34px; vertical-align: middle; margin-right: 0.5rem; filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.8));"> ISKCON Janmashtami Devotee Gateway</h2>
+          <p>Celebrating the Divine Birth of Lord Shree Krishna</p>
+        </div>
+      </div>
+
+      <!-- ── TAB 1: DASHBOARD ── -->
+      <section id="tab-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Registered Families</div>
+            <div class="stat-value" id="stat-reg-families">0</div>
+            <div class="stat-subtext" id="stat-reg-persons">0 Total Devotees</div>
+            <i class="fa-solid fa-users stat-icon"></i>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Gate Checked-In</div>
+            <div class="stat-value" id="stat-att-families" style="color: #34D399;">0</div>
+            <div class="stat-subtext" id="stat-att-persons">0 Devotees Inside</div>
+            <i class="fa-solid fa-circle-check stat-icon" style="color: #34D399;"></i>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Pending Arrivals</div>
+            <div class="stat-value" id="stat-pending-families" style="color: #FBBF24;">0</div>
+            <div class="stat-subtext">Families yet to scan token</div>
+            <i class="fa-solid fa-hourglass-half stat-icon" style="color: #FBBF24;"></i>
+          </div>
+
+          <div id="stat-collection-card" class="stat-card hidden">
+            <div class="stat-label">Total Collections</div>
+            <div class="stat-value" id="stat-collection" style="color: var(--accent-gold-light);">₹0</div>
+            <div class="stat-subtext">Entry donations collected</div>
+            <i class="fa-solid fa-indian-rupee-sign stat-icon" style="color: var(--accent-gold-light);"></i>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+          <!-- Hourly Flow Chart -->
+          <div class="glass-card">
+            <div class="glass-card-title">
+              <span><i class="fa-solid fa-chart-line"></i> Hourly Gate Traffic Flow</span>
+              <button class="nav-tab" style="padding: 0.2rem 0.6rem;" onclick="loadDashboardStats()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+            <div id="hourly-chart-container" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem 0;">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+          <!-- Leaderboard / User Performance -->
+          <div id="leaderboard-section" class="glass-card hidden">
+            <div class="glass-card-title">
+              <span><i class="fa-solid fa-trophy"></i> Volunteer Leaderboard</span>
+            </div>
+            <div class="table-responsive">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Volunteer Name</th>
+                    <th>Registrations</th>
+                    <th>Gate Scanned (Checked-In)</th>
+                    <th>Collection</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                  <!-- Dynamically Populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB 2: REGISTER FAMILY ── -->
+      <section id="tab-register" class="hidden">
+        <div style="max-width: 600px; margin: 0 auto;">
+          <div class="glass-card">
+            <div class="glass-card-title">
+              <span><i class="fa-solid fa-user-plus"></i> New Family Registration</span>
+            </div>
+
+            <form id="register-form">
+              <div class="form-group">
+                <label class="form-label">Head of Family Name *</label>
+                <input type="text" id="reg-name" class="form-control" placeholder="e.g. Ramesh Sharma" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Mobile Number (10 digits) *</label>
+                <input type="tel" id="reg-mobile" class="form-control" placeholder="e.g. 9876543210" pattern="[0-9]{10}" maxlength="10" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Full Address *</label>
+                <textarea id="reg-address" class="form-control" rows="2" placeholder="Street address, city" required></textarea>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                  <label class="form-label">Total Family Members *</label>
+                  <div class="counter-btn-group">
+                    <button type="button" class="counter-btn" onclick="updatePersons(-1)">-</button>
+                    <input type="number" id="reg-persons" class="form-control" value="1" min="1" max="50" style="text-align: center;" readonly>
+                    <button type="button" class="counter-btn" onclick="updatePersons(1)">+</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Free Entry Pass</label>
+                  <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer;">
+                    <input type="checkbox" id="reg-free-entry" onchange="toggleFreeEntry(this.checked)">
+                    <span style="font-weight: 600; font-size: 0.85rem; color: var(--accent-gold-light);">Free Pass (Rs. 0)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group" id="paid-field-container">
+                <label class="form-label">Amount Paid / Donation (₹)</label>
+                <input type="number" id="reg-paid" class="form-control" value="0" min="0" placeholder="0">
+              </div>
+
+              <button type="submit" class="btn-primary" style="margin-top: 1rem;">
+                <i class="fa-solid fa-ticket"></i> Issue Family Entry Token
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB 3: GATE SCAN ── -->
+      <section id="tab-scan" class="hidden">
+        <div style="max-width: 650px; margin: 0 auto; text-align: center;">
+          <div class="glass-card">
+            <div class="glass-card-title" style="justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+              <span><i class="fa-solid fa-qrcode"></i> Gate QR Attendance Scanner</span>
+              <button type="button" class="nav-tab" onclick="playChimeSound()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
+                <i class="fa-solid fa-volume-high"></i> Test Devotional Sound
+              </button>
+            </div>
+
+            <div id="qr-reader"></div>
+
+            <div style="margin-bottom: 1.5rem; position: relative;">
+              <span style="background: var(--bg-card); padding: 0 1rem; color: var(--text-muted); font-size: 0.85rem;">OR SEARCH BY TOKEN NO. / MOBILE NO.</span>
+            </div>
+
+            <form id="manual-scan-form" onsubmit="handleManualSearchSubmit(event)" style="display: flex; gap: 0.75rem; position: relative;">
+              <div style="flex: 1; position: relative;">
+                <input type="text" id="manual-token" class="form-control" placeholder="Search Token No. or Mobile (e.g. 982415...)" autocomplete="off" onfocus="handleScanSearchInput(this.value)" onclick="handleScanSearchInput(this.value)" oninput="handleScanSearchInput(this.value)" style="text-align: left; font-size: 0.98rem; padding-left: 1rem; background: rgba(15, 23, 42, 0.9); border: 2px solid var(--accent-peacock);">
+                <div id="scan-autocomplete-dropdown" class="autocomplete-dropdown hidden"></div>
+              </div>
+              <button type="submit" class="btn-primary" style="width: auto; padding: 0.8rem 1.4rem; flex-shrink: 0;">
+                <i class="fa-solid fa-magnifying-glass"></i> Check Token
+              </button>
+            </form>
+
+            <div id="scan-result-card" class="hidden" style="margin-top: 1.5rem; text-align: left; padding: 1.25rem; border-radius: 16px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--accent-gold);">
+              <div id="scan-result-badge" class="badge" style="margin-bottom: 0.5rem;"></div>
+              <h3 id="scan-result-name" style="font-size: 1.4rem; color: white;">Devotee Name</h3>
+              <p id="scan-result-details" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;"></p>
+              
+              <div id="scan-add-more-container" class="hidden" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <label class="form-label">Add remaining arriving family members:</label>
+                <div style="display: flex; gap: 0.5rem;">
+                  <input type="number" id="scan-extra-persons" class="form-control" value="1" min="1" max="10" style="width: 100px;">
+                  <button type="button" class="btn-primary" style="width: auto;" onclick="addExtraMembers()">Add Members</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB 4: REGISTRATIONS LIST ── -->
+      <section id="tab-registrations" class="hidden">
+        <div class="glass-card">
+          <div class="glass-card-title">
+            <span><i class="fa-solid fa-list"></i> Devotee Family Registrations</span>
+            <input type="text" id="reg-search" class="form-control" placeholder="Search by name, token, mobile..." style="width: 260px; font-size: 0.85rem;" onkeyup="filterRegistrationsTable()">
+          </div>
+
+          <div class="table-responsive">
+            <table class="custom-table" id="registrations-table">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Family Head</th>
+                  <th>Mobile</th>
+                  <th>Address</th>
+                  <th>Members</th>
+                  <th>Paid</th>
+                  <th>Registered By</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="registrations-table-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB 5: ATTENDANCE LOG ── -->
+      <section id="tab-attendance" class="hidden">
+        <div class="glass-card">
+          <div class="glass-card-title">
+            <span><i class="fa-solid fa-clock-rotate-left"></i> Gate Entry Attendance Log</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Family Head</th>
+                  <th>Mobile</th>
+                  <th>Devotees Counted</th>
+                  <th>Gate Entry Time</th>
+                  <th>Gate Volunteer (Scanned By)</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-table-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB 6: ADMIN USERS & SYSTEM ── -->
+      <section id="tab-users" class="hidden">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+          <div class="glass-card">
+            <div class="glass-card-title">
+              <span><i class="fa-solid fa-user-plus"></i> Add Volunteer Account</span>
+            </div>
+
+            <form id="create-user-form">
+              <div class="form-group">
+                <label class="form-label">Full Name *</label>
+                <input type="text" id="user-name" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Mobile (10 digits) *</label>
+                <input type="tel" id="user-mobile" class="form-control" pattern="[0-9]{10}" maxlength="10" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username *</label>
+                <input type="text" id="user-username" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password *</label>
+                <input type="password" id="user-password" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Role *</label>
+                <select id="user-role" class="form-control">
+                  <option value="user">Volunteer (User)</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-primary"><i class="fa-solid fa-user-check"></i> Create Account</button>
+            </form>
+          </div>
+
+          <div class="glass-card">
+            <div class="glass-card-title">
+              <span><i class="fa-solid fa-toolbox"></i> Reports & System Actions</span>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <button class="btn-primary" style="background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); color: white;" onclick="downloadCSVReport()">
+                <i class="fa-solid fa-file-csv"></i> Download CSV Data Report
+              </button>
+
+              <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(239, 68, 68, 0.3);">
+                <h4 style="color: #FCA5A5; margin-bottom: 0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</h4>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Reset registration database and attendance records.</p>
+                <button class="btn-primary" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; color: #FCA5A5;" onclick="triggerClearData()">
+                  <i class="fa-solid fa-trash-can"></i> Clear All Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="glass-card-title">
+            <span><i class="fa-solid fa-users-gear"></i> System User Accounts</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Mobile</th>
+                  <th>Role</th>
+                  <th>Created At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ── TOKEN PRINT / QR MODAL ── -->
+  <div id="token-modal" class="modal-overlay">
+    <div class="token-card">
+      <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Janmashtami 2026</h4>
+      <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">DEVOTEE ENTRY PASS</h2>
+      
+      <div class="token-number" id="modal-token-num">001</div>
+      <h3 id="modal-name" style="color: white; font-size: 1.2rem;">Devotee Name</h3>
+      <p id="modal-details" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;"></p>
+
+      <div class="qr-container">
+        <div id="modal-qrcode"></div>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
+        <button class="btn-primary" style="background: #25D366; color: white;" onclick="sendViaWhatsApp()"><i class="fa-brands fa-whatsapp"></i> Send via WhatsApp</button>
+        <button class="btn-primary" onclick="downloadQRImage()"><i class="fa-solid fa-download"></i> Download QR</button>
+        <button class="btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>
+        <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closeModal()">Close</button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.6rem;">
+        <i class="fa-solid fa-circle-info"></i> WhatsApp can't auto-attach the QR image via link &mdash; clicking "Send via WhatsApp" downloads the QR first, then opens the chat so you can attach it manually.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── JAVASCRIPT APP LOGIC ── -->
+  <script>
+    const API_BASE = window.location.origin;
+    let currentUser = null;
+    let html5QrCodeScanner = null;
+    let currentScannedToken = null;
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+    });
+
+    async function checkAuth() {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+        const data = await res.json();
+        if (data.authenticated) {
+          currentUser = data.user;
+          showAppView();
+        } else {
+          showLoginView();
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+        showLoginView();
+      }
+    }
+
+    // Login submit
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+      const errorDiv = document.getElementById('login-error');
+      errorDiv.classList.add('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          currentUser = data.user;
+          showAppView();
+        } else {
+          errorDiv.textContent = data.error || 'Invalid credentials';
+          errorDiv.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Server connection failed';
+        errorDiv.classList.remove('hidden');
+      }
+    });
+
+    async function handleLogout() {
+      await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+      currentUser = null;
+      showLoginView();
+    }
+
+    function showLoginView() {
+      document.getElementById('login-view').classList.remove('hidden');
+      document.getElementById('app-view').classList.add('hidden');
+    }
+
+    function showAppView() {
+      document.getElementById('login-view').classList.add('hidden');
+      document.getElementById('app-view').classList.remove('hidden');
+      
+      document.getElementById('user-display-name').textContent = currentUser.name;
+      const roleTag = document.getElementById('user-role-tag');
+      roleTag.textContent = currentUser.role.toUpperCase();
+      roleTag.className = `role-tag role-${currentUser.role}`;
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('nav-users-tab').classList.remove('hidden');
+        document.getElementById('stat-collection-card').classList.remove('hidden');
+        document.getElementById('leaderboard-section').classList.remove('hidden');
+      } else {
+        document.getElementById('nav-users-tab').classList.add('hidden');
+        document.getElementById('stat-collection-card').classList.add('hidden');
+        document.getElementById('leaderboard-section').classList.add('hidden');
+      }
+
+      switchTab('dashboard');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('section[id^="tab-"]').forEach(s => s.classList.add('hidden'));
+
+      const activeTabBtn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick')?.includes(tabId));
+      if (activeTabBtn) activeTabBtn.classList.add('active');
+
+      const targetSection = document.getElementById(`tab-${tabId}`);
+      if (targetSection) targetSection.classList.remove('hidden');
+
+      if (tabId === 'dashboard') loadDashboardStats();
+      if (tabId === 'registrations') loadRegistrations();
+      if (tabId === 'attendance') loadAttendanceLog();
+      if (tabId === 'scan') initScanner();
+      if (tabId === 'users' && currentUser.role === 'admin') loadUsersList();
+    }
+
+    // ── DASHBOARD LOAD ──
+    async function loadDashboardStats() {
+      try {
+        const res = await fetch(`${API_BASE}/api/stats`, { credentials: 'include' });
+        const stats = await res.json();
+        
+        document.getElementById('stat-reg-families').textContent = stats.registered_families || 0;
+        document.getElementById('stat-reg-persons').textContent = `${stats.registered_persons || 0} Total Devotees`;
+        document.getElementById('stat-att-families').textContent = stats.attended_families || 0;
+        document.getElementById('stat-att-persons').textContent = `${stats.attended_persons || 0} Devotees Inside`;
+        document.getElementById('stat-pending-families').textContent = stats.pending_families || 0;
+
+        if (currentUser.role === 'admin' && stats.collection !== undefined) {
+          document.getElementById('stat-collection').textContent = `₹${stats.collection.toLocaleString('en-IN')}`;
+        }
+
+        // Hourly Chart
+        const hRes = await fetch(`${API_BASE}/api/attendance/hourly`, { credentials: 'include' });
+        const hData = await hRes.json();
+        renderHourlyChart(hData.hourly);
+
+        // Leaderboard
+        if (currentUser.role === 'admin') {
+          const uRes = await fetch(`${API_BASE}/api/admin/user-stats`, { credentials: 'include' });
+          const uData = await uRes.json();
+          renderLeaderboard(uData.user_stats);
+        }
+      } catch (err) {
+        console.error('Stats load error:', err);
+      }
+    }
+
+    function renderHourlyChart(hourly) {
+      const container = document.getElementById('hourly-chart-container');
+      container.innerHTML = '';
+      let maxCount = 1;
+      Object.values(hourly).forEach(v => { if (v.persons > maxCount) maxCount = v.persons; });
+
+      for (let h = 8; h <= 21; h++) {
+        const slot = hourly[h] || { families: 0, persons: 0 };
+        const label = h > 12 ? `${h-12} PM` : (h === 12 ? '12 PM' : `${h} AM`);
+        const pct = Math.round((slot.persons / maxCount) * 100);
+
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '0.75rem';
+        row.innerHTML = `
+          <span style="width: 50px; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">${label}</span>
+          <div style="flex: 1; background: rgba(15,23,42,0.8); height: 18px; border-radius: 9px; overflow: hidden;">
+            <div style="width: ${pct}%; background: linear-gradient(90deg, #F59E0B, #06B6D4); height: 100%; border-radius: 9px; transition: width 0.5s ease;"></div>
+          </div>
+          <span style="font-size: 0.75rem; font-weight: 700; color: white; width: 60px; text-align: right;">${slot.persons} dev.</span>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function renderLeaderboard(users) {
+      const body = document.getElementById('leaderboard-body');
+      body.innerHTML = users.map(u => `
+        <tr>
+          <td><strong>${u.name}</strong> <small style="color: var(--text-muted);">(@${u.username})</small></td>
+          <td>${u.families_registered}</td>
+          <td>${u.persons_registered}</td>
+          <td style="color: var(--accent-gold-light); font-weight: 700;">₹${u.collection}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── REGISTER FAMILY ──
+    function updatePersons(delta) {
+      const input = document.getElementById('reg-persons');
+      let val = parseInt(input.value) + delta;
+      if (val >= 1 && val <= 50) input.value = val;
+    }
+
+    function toggleFreeEntry(isFree) {
+      const container = document.getElementById('paid-field-container');
+      const paidInput = document.getElementById('reg-paid');
+      if (isFree) {
+        container.style.opacity = '0.4';
+        paidInput.value = 0;
+        paidInput.disabled = true;
+      } else {
+        container.style.opacity = '1';
+        paidInput.disabled = false;
+      }
+    }
+
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value;
+      const mobile = document.getElementById('reg-mobile').value;
+      const address = document.getElementById('reg-address').value;
+      const persons = parseInt(document.getElementById('reg-persons').value);
+      const free_entry = document.getElementById('reg-free-entry').checked;
+      const paid = free_entry ? 0 : parseInt(document.getElementById('reg-paid').value || 0);
+
+      if (!free_entry && paid <= 0) {
+        alert('Enter the amount paid, or check "Free Pass" if no payment was collected.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name, mobile, address, persons, free_entry, paid })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          data.mobile = mobile;
+          document.getElementById('register-form').reset();
+          document.getElementById('reg-persons').value = 1;
+          showTokenModal(data);
+        } else {
+          alert('Registration Error: ' + (data.error || 'Failed'));
+        }
+      } catch (err) {
+        alert('Server Error during registration');
+      }
+    });
+
+    let currentTokenData = null;
+
+    function showTokenModal(data) {
+      currentTokenData = data;
+      document.getElementById('modal-token-num').textContent = data.token;
+      document.getElementById('modal-name').textContent = data.name;
+      document.getElementById('modal-details').textContent = `${data.persons} Family Member(s) | ${data.free_entry ? 'Free Entry Pass' : 'Paid ₹' + data.paid}`;
+
+      const qrContainer = document.getElementById('modal-qrcode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: data.token,
+        width: 160,
+        height: 160,
+        colorDark: "#0F172A",
+        colorLight: "#FFFFFF",
+      });
+
+      document.getElementById('token-modal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('token-modal').classList.remove('active');
+    }
+
+    function getQRCanvas() {
+      const qrContainer = document.getElementById('modal-qrcode');
+      return qrContainer.querySelector('canvas');
+    }
+
+    function downloadQRImage() {
+      if (!currentTokenData) return;
+      const canvas = getQRCanvas();
+      if (!canvas) { alert('QR code not ready yet.'); return; }
+      const link = document.createElement('a');
+      link.download = `ISKCON_Token_${currentTokenData.token}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function buildWhatsAppMessage(data) {
+      const entryLine = data.free_entry ? 'Entry: Free Pass' : `Paid: ₹${data.paid}`;
+      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${entryLine}\n\n📌 Please keep the attached QR code image handy and show it at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
+    }
+
+    function sendViaWhatsApp() {
+      if (!currentTokenData) return;
+      const mobile = String(currentTokenData.mobile || '').trim();
+      if (!/^\d{10}$/.test(mobile)) {
+        alert('No valid 10-digit mobile number on this registration to message.');
+        return;
+      }
+      downloadQRImage();
+      const message = buildWhatsAppMessage(currentTokenData);
+      const waUrl = `https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    // ── SCANNER ──
+    function playChimeSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Authentic ISKCON Temple Brass Bell Multi-Harmonic Sound Algorithm
+        const bellFrequencies = [440, 880, 1320, 1760, 2640];
+        const now = ctx.currentTime;
+        
+        [0, 0.18, 0.40].forEach((delay, strikeIdx) => {
+          bellFrequencies.forEach((freq, hIdx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = hIdx % 2 === 0 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(freq * (strikeIdx === 2 ? 1.25 : 1), now + delay);
+            
+            const vol = 0.25 / (hIdx + 1);
+            gain.gain.setValueAtTime(vol, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + (1.2 - hIdx * 0.15));
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + delay);
+            osc.stop(now + delay + 1.2);
+          });
+        });
+      } catch (e) {
+        console.error('Audio chime error:', e);
+      }
+    }
+
+    function playWarningSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.setValueAtTime(180, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) {}
+    }
+
+    // ── LIVE AUTOCOMPLETE SCAN SEARCH ──
+    let searchDebounceTimer = null;
+    async function handleScanSearchInput(val) {
+      clearTimeout(searchDebounceTimer);
+      const dropdown = document.getElementById('scan-autocomplete-dropdown');
+
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const query = (val || '').trim();
+          const res = await fetch(`${API_BASE}/api/gate/search?q=${encodeURIComponent(query)}`, { credentials: 'include' });
+          const data = await res.json();
+          
+          if (!data.results || data.results.length === 0) {
+            dropdown.innerHTML = `<div style="padding: 1rem; text-align: center; color: #FCA5A5; font-size: 0.88rem; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> No registered family found for "${query}"</div>`;
+            dropdown.classList.remove('hidden');
+            return;
+          }
+
+          dropdown.innerHTML = data.results.map(r => `
+            <div class="autocomplete-item" onclick="selectAutocompleteToken('${r.token}')">
+              <div style="text-align: left;">
+                <div style="font-weight: 700; color: white; font-size: 0.95rem;">
+                  <span class="token-badge" style="margin-right: 0.5rem; font-size:0.8rem; background: var(--grad-morpankh); color:#030D22;">Token #${r.token}</span> ${r.name}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--accent-peacock); margin-top: 0.25rem;">
+                  <i class="fa-solid fa-phone"></i> ${r.mobile} | <i class="fa-solid fa-users"></i> ${r.persons} Member(s)
+                </div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0; margin-left: 0.75rem;">
+                ${r.attended ? `<span class="badge badge-warning" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;"><i class="fa-solid fa-clock"></i> Inside (${r.gate_time})</span>` : `<span class="badge badge-success" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;"><i class="fa-solid fa-user-check"></i> Ready to Enter</span>`}
+              </div>
+            </div>
+          `).join('');
+          dropdown.classList.remove('hidden');
+        } catch (err) {
+          console.error('Autocomplete search error:', err);
+        }
+      }, 100);
+    }
+
+    function selectAutocompleteToken(token) {
+      document.getElementById('manual-token').value = token;
+      document.getElementById('scan-autocomplete-dropdown').classList.add('hidden');
+      processTokenCheck(token);
+    }
+
+    function handleManualSearchSubmit(e) {
+      e.preventDefault();
+      document.getElementById('scan-autocomplete-dropdown').classList.add('hidden');
+      const token = document.getElementById('manual-token').value.trim();
+      if (token) processTokenCheck(token);
+    }
+
+    // Hide autocomplete on click outside
+    document.addEventListener('click', (e) => {
+      const form = document.getElementById('manual-scan-form');
+      if (form && !form.contains(e.target)) {
+        const dropdown = document.getElementById('scan-autocomplete-dropdown');
+        if (dropdown) dropdown.classList.add('hidden');
+      }
+    });
+
+    function initScanner() {
+      if (html5QrCodeScanner) return;
+      html5QrCodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
+      html5QrCodeScanner.render((tokenStr) => {
+        processTokenCheck(tokenStr);
+      }, (err) => {});
+    }
+
+    document.getElementById('manual-scan-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const token = document.getElementById('manual-token').value.trim();
+      if (token) processTokenCheck(token);
+    });
+
+    async function processTokenCheck(token, addMore = false, extraPersons = 0) {
+      currentScannedToken = token;
+      try {
+        const payload = { token };
+        if (addMore) {
+          payload.add_more = true;
+          payload.persons = extraPersons;
+        }
+
+        const res = await fetch(`${API_BASE}/api/gate/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const card = document.getElementById('scan-result-card');
+        const badge = document.getElementById('scan-result-badge');
+        const nameEl = document.getElementById('scan-result-name');
+        const detEl = document.getElementById('scan-result-details');
+        const addContainer = document.getElementById('scan-add-more-container');
+
+        card.classList.remove('hidden');
+        addContainer.classList.add('hidden');
+
+        if (data.status === 'success') {
+          playChimeSound();
+          document.getElementById('manual-token').value = data.token;
+          badge.className = 'badge badge-success';
+          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> GATE ENTRY GRANTED';
+          nameEl.textContent = data.name;
+          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> <strong>${data.persons} Devotee(s)</strong> Checked-in at <strong>${data.gate_time}</strong>`;
+          loadDashboardStats();
+          loadAttendanceLog();
+        } else if (data.status === 'duplicate') {
+          playWarningSound();
+          document.getElementById('manual-token').value = data.token;
+          badge.className = 'badge badge-warning';
+          badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ALREADY CHECKED-IN AT GATE';
+          nameEl.textContent = data.name;
+          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem;">Token #${data.token}</span> Initial entry logged at ${data.gate_time}. Inside: ${data.persons}/${data.registered} Devotees.`;
+          if (data.remaining > 0) {
+            addContainer.classList.remove('hidden');
+          }
+        } else {
+          playWarningSound();
+          badge.className = 'badge badge-danger';
+          badge.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> TOKEN NOT FOUND';
+          nameEl.textContent = 'Invalid Token / Search';
+          detEl.textContent = data.message || 'Token not found in registration database.';
+        }
+      } catch (err) {
+        alert('Scan verification error');
+      }
+    }
+
+    function addExtraMembers() {
+      const count = parseInt(document.getElementById('scan-extra-persons').value || 1);
+      if (currentScannedToken) {
+        processTokenCheck(currentScannedToken, true, count);
+      }
+    }
+
+    // ── REGISTRATIONS TABLE ──
+    async function loadRegistrations() {
+      try {
+        const res = await fetch(`${API_BASE}/api/registrations`, { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('registrations-table-body');
+        tbody.innerHTML = data.registrations.map(r => `
+          <tr>
+            <td><strong style="color: var(--accent-gold-light);">${r.token}</strong></td>
+            <td>${r.name}</td>
+            <td>${r.mobile}</td>
+            <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.address}</td>
+            <td>${r.persons}</td>
+            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : '₹' + r.paid}</td>
+            <td>${r.registered_by_name || 'System'}</td>
+            <td>
+              ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Registrations load error:', err);
+      }
+    }
+
+    function filterRegistrationsTable() {
+      const q = document.getElementById('reg-search').value.toLowerCase();
+      const rows = document.querySelectorAll('#registrations-table-body tr');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // ── ATTENDANCE LOG ──
+    async function loadAttendanceLog() {
+      try {
+        const res = await fetch(`${API_BASE}/api/attendance`, { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('attendance-table-body');
+        if (!data.attendance || data.attendance.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No gate attendance records found yet.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.attendance.map(a => `
+          <tr>
+            <td><strong style="color: var(--accent-gold-light);">${a.token}</strong></td>
+            <td>${a.name}</td>
+            <td>${a.mobile || '-'}</td>
+            <td><span class="badge badge-success">${a.persons} Devotee(s)</span></td>
+            <td>${a.gate_time}</td>
+            <td><span class="user-badge" style="display:inline-flex; padding:0.25rem 0.65rem; font-size:0.78rem;"><i class="fa-solid fa-user-check" style="color:var(--accent-peacock); margin-right:0.35rem;"></i> ${a.scanned_by_name || 'Volunteer'}</span></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Attendance log error:', err);
+      }
+    }
+
+    // ── ADMIN USERS ──
+    async function loadUsersList() {
+      try {
+        const res = await fetch(`${API_BASE}/api/users`, { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = data.users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td><strong>${u.name}</strong></td>
+            <td>@${u.username}</td>
+            <td>${u.mobile}</td>
+            <td><span class="role-tag role-${u.role}">${u.role.toUpperCase()}</span></td>
+            <td>${u.created_at}</td>
+            <td>
+              <button class="btn-logout" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteUser(${u.id})">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Users load error:', err);
+      }
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('user-name').value;
+      const mobile = document.getElementById('user-mobile').value;
+      const username = document.getElementById('user-username').value;
+      const password = document.getElementById('user-password').value;
+      const role = document.getElementById('user-role').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name, mobile, username, password, role })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert('User created successfully');
+          document.getElementById('create-user-form').reset();
+          loadUsersList();
+        } else {
+          alert('User creation failed: ' + (data.error || 'Error'));
+        }
+      } catch (err) {
+        alert('Server error creating user');
+      }
+    });
+
+    async function deleteUser(uid) {
+      if (!confirm('Are you sure you want to delete this user?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/users/${uid}`, { method: 'DELETE', credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          loadUsersList();
+        } else {
+          alert('Failed to delete: ' + (data.error || 'Error'));
+        }
+      } catch (err) {
+        alert('Server error deleting user');
+      }
+    }
+
+    function downloadCSVReport() {
+      window.open(`${API_BASE}/api/export/csv`, '_blank');
+    }
+
+    async function triggerClearData() {
+      const code = prompt('DANGER: Type confirmation code "ISKCON_JANMASTMI_CLEAR_2026" to reset all data:');
+      if (code !== 'ISKCON_JANMASTMI_CLEAR_2026') return alert('Invalid code. Operation cancelled.');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/clear`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ secret: code })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert('All registration & attendance data cleared.');
+          loadDashboardStats();
+        } else {
+          alert('Clear failed: ' + (data.error || 'Error'));
+        }
+      } catch (err) {
+        alert('Server error clearing data');
+      }
+    }
+  </script>
+</body>
+</html>
