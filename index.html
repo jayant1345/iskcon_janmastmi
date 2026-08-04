@@ -1627,22 +1627,35 @@
     // ── SCANNER ──
     function playChimeSound() {
       try {
+        const audio = new Audio('hare_krishna_chime.mp3');
+        audio.volume = 1.0;
+        audio.play().catch((e) => {
+          console.error('Hare Krishna chime playback failed, using fallback bell:', e);
+          playSynthBellFallback();
+        });
+      } catch (e) {
+        playSynthBellFallback();
+      }
+    }
+
+    function playSynthBellFallback() {
+      try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         // Authentic ISKCON Temple Brass Bell Multi-Harmonic Sound Algorithm
         const bellFrequencies = [440, 880, 1320, 1760, 2640];
         const now = ctx.currentTime;
-        
+
         [0, 0.18, 0.40].forEach((delay, strikeIdx) => {
           bellFrequencies.forEach((freq, hIdx) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = hIdx % 2 === 0 ? 'sine' : 'triangle';
             osc.frequency.setValueAtTime(freq * (strikeIdx === 2 ? 1.25 : 1), now + delay);
-            
+
             const vol = 0.25 / (hIdx + 1);
             gain.gain.setValueAtTime(vol, now + delay);
             gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + (1.2 - hIdx * 0.15));
-            
+
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(now + delay);
