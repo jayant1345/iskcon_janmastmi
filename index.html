@@ -1170,7 +1170,7 @@
         <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closeModal()">Close</button>
       </div>
       <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.6rem;">
-        <i class="fa-solid fa-circle-info"></i> WhatsApp can't auto-attach an image via link &mdash; clicking "Send via WhatsApp" downloads the full invitation card first, then opens the chat so you can attach it manually.
+        <i class="fa-solid fa-circle-info"></i> On phones, "Send via WhatsApp" opens your share sheet with the invitation card already attached &mdash; just pick WhatsApp. On desktop browsers (which can't share files this way), it downloads the card and opens WhatsApp Web for you to attach manually.
       </p>
     </div>
   </div>
@@ -1570,8 +1570,11 @@
       return lines;
     }
 
+    let cachedInvitationCanvas = null;
+
     function showTokenModal(data) {
       currentTokenData = data;
+      cachedInvitationCanvas = null;
       document.getElementById('modal-token-num').textContent = data.token;
       document.getElementById('modal-name').textContent = data.name;
       document.getElementById('modal-details').innerHTML =
@@ -1588,6 +1591,13 @@
       });
 
       document.getElementById('token-modal').classList.add('active');
+
+      // Pre-build the shareable card now, while the modal is open, so "Send via WhatsApp"
+      // can call navigator.share() with as little delay after the click as possible --
+      // some mobile browsers only honor share() when it's tied closely to the user gesture.
+      requestAnimationFrame(() => {
+        buildInvitationCanvas().then(canvas => { cachedInvitationCanvas = canvas; });
+      });
     }
 
     function closeModal() {
@@ -1745,14 +1755,25 @@
       return canvas;
     }
 
-    async function downloadInvitationCard() {
-      if (!currentTokenData) return null;
+    async function getInvitationCanvas() {
+      if (cachedInvitationCanvas) return cachedInvitationCanvas;
       const canvas = await buildInvitationCanvas();
-      if (!canvas) { alert('Could not generate the invitation card image.'); return null; }
+      cachedInvitationCanvas = canvas;
+      return canvas;
+    }
+
+    function triggerCanvasDownload(canvas, token) {
       const link = document.createElement('a');
-      link.download = `ISKCON_Invitation_${currentTokenData.token}.png`;
+      link.download = `ISKCON_Invitation_${token}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
+    }
+
+    async function downloadInvitationCard() {
+      if (!currentTokenData) return null;
+      const canvas = await getInvitationCanvas();
+      if (!canvas) { alert('Could not generate the invitation card image.'); return null; }
+      triggerCanvasDownload(canvas, currentTokenData.token);
       return canvas;
     }
 
@@ -1768,8 +1789,29 @@
         alert('No valid 10-digit mobile number on this registration to message.');
         return;
       }
-      await downloadInvitationCard();
       const message = buildWhatsAppMessage(currentTokenData);
+      const canvas = await getInvitationCanvas();
+      if (!canvas) { alert('Could not generate the invitation card image.'); return; }
+
+      // Try the native share sheet first -- on supporting mobile browsers this hands the
+      // image straight to WhatsApp with the file already attached, no manual download +
+      // attach step. Desktop browsers mostly don't support file sharing, so this silently
+      // falls through to the download + wa.me fallback below.
+      if (navigator.canShare) {
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], `ISKCON_Invitation_${currentTokenData.token}.png`, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text: message });
+            return;
+          }
+        } catch (e) {
+          if (e && e.name === 'AbortError') return; // user cancelled the share sheet deliberately
+          console.error('Native share failed, falling back to download + wa.me:', e);
+        }
+      }
+
+      triggerCanvasDownload(canvas, currentTokenData.token);
       const waUrl = `https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
     }
