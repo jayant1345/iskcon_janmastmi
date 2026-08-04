@@ -928,7 +928,7 @@
               </div>
 
               <button type="submit" class="btn-primary" style="margin-top: 1rem;">
-                <i class="fa-solid fa-ticket"></i> Issue Family Entry Token
+                <i class="fa-solid fa-ticket"></i> Continue
               </button>
             </form>
           </div>
@@ -1065,6 +1065,11 @@
                 <input type="password" id="user-password" class="form-control" required>
               </div>
               <div class="form-group">
+                <label class="form-label">UPI ID (e.g. 9876543210@ybl)</label>
+                <input type="text" id="user-upi-id" class="form-control" placeholder="name@bank">
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.3rem;">Needed so this volunteer's UPI payment QR codes work. Leave blank if they'll only collect cash.</p>
+              </div>
+              <div class="form-group">
                 <label class="form-label">Role *</label>
                 <select id="user-role" class="form-control">
                   <option value="user">Volunteer (User)</option>
@@ -1131,6 +1136,7 @@
                   <th>Name</th>
                   <th>Username</th>
                   <th>Mobile</th>
+                  <th>UPI ID</th>
                   <th>Role</th>
                   <th>Created At</th>
                   <th>Action</th>
@@ -1171,6 +1177,43 @@
       </div>
       <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.6rem;">
         <i class="fa-solid fa-circle-info"></i> On phones, "Send via WhatsApp" opens your share sheet with the invitation card already attached &mdash; just pick WhatsApp. On desktop browsers (which can't share files this way), it downloads the card and opens WhatsApp Web for you to attach manually.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── PAYMENT COLLECTION MODAL ── -->
+  <div id="payment-modal" class="modal-overlay">
+    <div class="token-card">
+      <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Janmashtami 2026</h4>
+      <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">COLLECT PAYMENT</h2>
+
+      <h3 id="payment-summary-name" style="color: white; font-size: 1.2rem; margin-top: 0.5rem;">Family Name</h3>
+      <p id="payment-breakdown" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;"></p>
+      <div class="token-number" id="payment-total-display" style="margin-top: 0.75rem;">₹0</div>
+
+      <div id="payment-upi-qr-section" style="margin-top: 1rem;">
+        <div class="qr-container">
+          <div id="payment-upi-qrcode"></div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Ask the family to scan with any UPI app to pay this amount directly to you.</p>
+      </div>
+      <p id="payment-no-upi-msg" class="hidden" style="color: #FBBF24; font-size: 0.85rem; margin-top: 1rem;">
+        <i class="fa-solid fa-triangle-exclamation"></i> No UPI ID is set on your account &mdash; ask the admin to add one (Volunteers &amp; Admin tab) if you want to accept UPI payments. You can still collect cash.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.25rem;">
+        <button id="payment-upi-confirm-btn" class="btn-primary" style="background: #25D366; color: white;" onclick="finalizeRegistration('upi')">
+          <i class="fa-solid fa-circle-check"></i> Payment Received via UPI
+        </button>
+        <button class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white;" onclick="finalizeRegistration('cash')">
+          <i class="fa-solid fa-money-bill-wave"></i> Cash Received
+        </button>
+        <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closePaymentModal()">
+          <i class="fa-solid fa-arrow-left"></i> Back / Edit Details
+        </button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.75rem;">
+        <i class="fa-solid fa-circle-info"></i> The token and invitation card are only created once you confirm payment above.
       </p>
     </div>
   </div>
@@ -1522,33 +1565,87 @@
       return { tokenAmount, aartiAmount, abhishekAmount, donationAmount, total };
     }
 
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('reg-name').value;
-      const mobile = document.getElementById('reg-mobile').value;
-      const address = document.getElementById('reg-address').value;
-      const persons = parseInt(document.getElementById('reg-persons').value);
-      const free_entry = document.getElementById('reg-free-entry').checked;
-      const aarti_amount = document.getElementById('reg-aarti').checked ? parseInt(document.getElementById('reg-aarti-amount').value || 0) : 0;
-      const abhishek_amount = document.getElementById('reg-abhishek').checked ? parseInt(document.getElementById('reg-abhishek-amount').value || 0) : 0;
-      const donation_amount = parseInt(document.getElementById('reg-donation-amount').value || 0);
+    let pendingRegistration = null;
 
+    function gatherRegistrationFormData() {
+      return {
+        name: document.getElementById('reg-name').value,
+        mobile: document.getElementById('reg-mobile').value,
+        address: document.getElementById('reg-address').value,
+        persons: parseInt(document.getElementById('reg-persons').value),
+        free_entry: document.getElementById('reg-free-entry').checked,
+      };
+    }
+
+    function resetRegistrationForm() {
+      document.getElementById('register-form').reset();
+      document.getElementById('reg-persons').value = 1;
+      document.getElementById('reg-aarti-amount').disabled = true;
+      document.getElementById('reg-abhishek-amount').disabled = true;
+      updateBookingTotal();
+    }
+
+    function openPaymentModal(amounts) {
+      const form = gatherRegistrationFormData();
+      pendingRegistration = {
+        ...form,
+        aarti_amount: amounts.aartiAmount,
+        abhishek_amount: amounts.abhishekAmount,
+        donation_amount: amounts.donationAmount,
+      };
+
+      document.getElementById('payment-summary-name').textContent = form.name;
+      document.getElementById('payment-total-display').textContent = `₹${amounts.total}`;
+
+      const breakdownLines = [];
+      if (amounts.tokenAmount) breakdownLines.push(`Token Entry: ₹${amounts.tokenAmount}`);
+      if (amounts.aartiAmount) breakdownLines.push(`Aarti Seva: ₹${amounts.aartiAmount}`);
+      if (amounts.abhishekAmount) breakdownLines.push(`Abhishek Seva: ₹${amounts.abhishekAmount}`);
+      if (amounts.donationAmount) breakdownLines.push(`Donation: ₹${amounts.donationAmount}`);
+      document.getElementById('payment-breakdown').textContent = breakdownLines.join(' · ');
+
+      const upiId = currentUser && currentUser.upi_id;
+      const qrSection = document.getElementById('payment-upi-qr-section');
+      const noUpiMsg = document.getElementById('payment-no-upi-msg');
+      const qrContainer = document.getElementById('payment-upi-qrcode');
+      qrContainer.innerHTML = '';
+      const upiConfirmBtn = document.getElementById('payment-upi-confirm-btn');
+      if (upiId) {
+        qrSection.classList.remove('hidden');
+        noUpiMsg.classList.add('hidden');
+        upiConfirmBtn.classList.remove('hidden');
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(currentUser.name)}&am=${amounts.total}&cu=INR&tn=${encodeURIComponent('ISKCON Janmashtami - ' + form.name)}`;
+        new QRCode(qrContainer, { text: upiUrl, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
+      } else {
+        qrSection.classList.add('hidden');
+        noUpiMsg.classList.remove('hidden');
+        upiConfirmBtn.classList.add('hidden');
+      }
+
+      document.getElementById('payment-modal').classList.add('active');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('payment-modal').classList.remove('active');
+    }
+
+    async function finalizeRegistration(paymentMode) {
+      if (!pendingRegistration) return;
+      const payload = { ...pendingRegistration, payment_mode: paymentMode };
       try {
         const res = await fetch(`${API_BASE}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name, mobile, address, persons, free_entry, aarti_amount, abhishek_amount, donation_amount })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          data.mobile = mobile;
-          data.address = address;
-          document.getElementById('register-form').reset();
-          document.getElementById('reg-persons').value = 1;
-          document.getElementById('reg-aarti-amount').disabled = true;
-          document.getElementById('reg-abhishek-amount').disabled = true;
-          updateBookingTotal();
+          data.mobile = pendingRegistration.mobile;
+          data.address = pendingRegistration.address;
+          closePaymentModal();
+          resetRegistrationForm();
+          pendingRegistration = null;
           showTokenModal(data);
         } else {
           alert('Registration Error: ' + (data.error || 'Failed'));
@@ -1556,6 +1653,26 @@
       } catch (err) {
         alert('Server Error during registration');
       }
+    }
+
+    document.getElementById('register-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const amounts = updateBookingTotal();
+      const form = gatherRegistrationFormData();
+
+      if (form.free_entry || amounts.total <= 0) {
+        // Nothing to collect -- clicking Continue is itself the confirming action.
+        pendingRegistration = {
+          ...form,
+          aarti_amount: amounts.aartiAmount,
+          abhishek_amount: amounts.abhishekAmount,
+          donation_amount: amounts.donationAmount,
+        };
+        finalizeRegistration(form.free_entry ? 'free' : 'cash');
+        return;
+      }
+
+      openPaymentModal(amounts);
     });
 
     let currentTokenData = null;
@@ -2113,10 +2230,13 @@
     }
 
     // ── ADMIN USERS ──
+    let allUsersById = {};
+
     async function loadUsersList() {
       try {
         const res = await fetch(`${API_BASE}/api/users`, { credentials: 'include' });
         const data = await res.json();
+        allUsersById = Object.fromEntries(data.users.map(u => [u.id, u]));
         const tbody = document.getElementById('users-table-body');
         tbody.innerHTML = data.users.map(u => `
           <tr>
@@ -2124,9 +2244,11 @@
             <td><strong>${u.name}</strong></td>
             <td>@${u.username}</td>
             <td>${u.mobile}</td>
+            <td>${u.upi_id ? u.upi_id : '<span style="color:#FBBF24;">Not set</span>'}</td>
             <td><span class="role-tag role-${u.role}">${u.role.toUpperCase()}</span></td>
             <td>${u.created_at}</td>
             <td>
+              <button class="btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; width: auto;" onclick="promptSetUpi(${u.id})">Set UPI</button>
               <button class="btn-logout" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteUser(${u.id})">Delete</button>
             </td>
           </tr>
@@ -2136,12 +2258,36 @@
       }
     }
 
+    async function promptSetUpi(uid) {
+      const u = allUsersById[uid];
+      if (!u) return;
+      const newUpi = prompt(`UPI ID for ${u.name} (e.g. 9876543210@ybl). Leave blank to clear:`, u.upi_id || '');
+      if (newUpi === null) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/users/${uid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: u.name, mobile: u.mobile, role: u.role, upi_id: newUpi.trim() })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          loadUsersList();
+        } else {
+          alert('Failed to update UPI ID: ' + (data.error || 'Error'));
+        }
+      } catch (err) {
+        alert('Server error updating UPI ID');
+      }
+    }
+
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('user-name').value;
       const mobile = document.getElementById('user-mobile').value;
       const username = document.getElementById('user-username').value;
       const password = document.getElementById('user-password').value;
+      const upi_id = document.getElementById('user-upi-id').value;
       const role = document.getElementById('user-role').value;
 
       try {
@@ -2149,7 +2295,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name, mobile, username, password, role })
+          body: JSON.stringify({ name, mobile, username, password, upi_id, role })
         });
         const data = await res.json();
         if (res.ok && data.success) {

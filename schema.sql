@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(256)  NOT NULL,
     name          VARCHAR(150)  NOT NULL,
     mobile        VARCHAR(15)   NOT NULL,
+    upi_id        VARCHAR(100)  NULL,          -- Real UPI VPA (e.g. name@ybl), used for payment QR codes
     role          ENUM('admin','user') NOT NULL DEFAULT 'user',
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_username (username)
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     aarti_amount     INT          NOT NULL DEFAULT 0, -- Optional Aarti seva amount
     abhishek_amount  INT          NOT NULL DEFAULT 0, -- Optional Abhishek seva amount
     donation_amount  INT          NOT NULL DEFAULT 0, -- Optional donation, 80G receipt issued separately
+    payment_mode     VARCHAR(10)  NOT NULL DEFAULT 'cash', -- 'cash', 'upi', or 'free' -- how payment was confirmed
     free_entry       TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag (zeroes token_amount only)
     registered_by    INT          NULL,               -- FK to users.id
     reg_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

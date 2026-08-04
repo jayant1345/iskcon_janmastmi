@@ -180,7 +180,9 @@ def init_db():
                 ('registrations', 'aarti_amount',       "ALTER TABLE registrations ADD COLUMN aarti_amount INT NOT NULL DEFAULT 0"),
                 ('registrations', 'abhishek_amount',    "ALTER TABLE registrations ADD COLUMN abhishek_amount INT NOT NULL DEFAULT 0"),
                 ('registrations', 'donation_amount',    "ALTER TABLE registrations ADD COLUMN donation_amount INT NOT NULL DEFAULT 0"),
+                ('registrations', 'payment_mode',       "ALTER TABLE registrations ADD COLUMN payment_mode VARCHAR(10) NOT NULL DEFAULT 'cash'"),
                 ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
+                ('users',         'upi_id',              "ALTER TABLE users ADD COLUMN upi_id VARCHAR(100) NULL"),
             ]
             for table, col_name, col_sql in migrations:
                 try:
@@ -316,6 +318,7 @@ def login():
     session['name']     = user['name']
     session['mobile']   = user['mobile']
     session['role']     = user['role']
+    session['upi_id']   = user.get('upi_id') or ''
     log.info(f"Login successful: {username} (Role: {user['role']})")
     return jsonify({
         'success': True,
@@ -324,7 +327,7 @@ def login():
             'username': user['username'],
             'name':     user['name'],
             'mobile':   user['mobile'],
-            'upi_id':   user['mobile'] + '@upi',
+            'upi_id':   user.get('upi_id') or '',
             'role':     user['role'],
         }
     })
@@ -346,7 +349,7 @@ def auth_me():
             'username': session['username'],
             'name':     session['name'],
             'mobile':   session['mobile'],
-            'upi_id':   session['mobile'] + '@upi',
+            'upi_id':   session.get('upi_id') or '',
             'role':     session['role'],
         }
     })
@@ -354,12 +357,14 @@ def auth_me():
 # ============================================================
 #  USER MANAGEMENT (ADMIN ONLY)
 # ============================================================
+UPI_ID_RE = re.compile(r'^[\w.\-]{2,256}@[a-zA-Z]{2,64}$')
+
 @app.route('/api/users', methods=['GET'])
 @admin_required
 def list_users():
-    users = db_query("SELECT id, username, name, mobile, role, created_at FROM users ORDER BY id")
+    users = db_query("SELECT id, username, name, mobile, upi_id, role, created_at FROM users ORDER BY id")
     for u in users:
-        u['upi_id'] = u['mobile'] + '@upi'
+        u['upi_id'] = u.get('upi_id') or ''
         if u.get('created_at'):
             u['created_at'] = u['created_at'].strftime('%d/%m/%Y %H:%M')
     return jsonify({'users': users})
@@ -372,6 +377,7 @@ def create_user():
     password = str(data.get('password', ''))
     name     = str(data.get('name', '')).strip()
     mobile   = str(data.get('mobile', '')).strip()
+    upi_id   = str(data.get('upi_id', '')).strip()
     role     = data.get('role', 'user')
 
     if not all([username, password, name, mobile]):
@@ -380,10 +386,12 @@ def create_user():
         return jsonify({'error': 'Invalid role specified'}), 400
     if not re.match(r'^\d{10}$', mobile):
         return jsonify({'error': 'Mobile must be exactly 10 digits'}), 400
+    if upi_id and not UPI_ID_RE.match(upi_id):
+        return jsonify({'error': 'UPI ID must look like name@bank (e.g. 9876543210@ybl)'}), 400
     try:
         uid = db_execute(
-            "INSERT INTO users (username, password_hash, name, mobile, role) VALUES (%s,%s,%s,%s,%s)",
-            (username, generate_password_hash(password), name, mobile, role)
+            "INSERT INTO users (username, password_hash, name, mobile, upi_id, role) VALUES (%s,%s,%s,%s,%s,%s)",
+            (username, generate_password_hash(password), name, mobile, upi_id or None, role)
         )
         log.info(f'Created user: {username} role={role}')
         return jsonify({'success': True, 'id': uid}), 201
@@ -398,6 +406,7 @@ def update_user(uid):
     data = request.get_json()
     name   = str(data.get('name', '')).strip()
     mobile = str(data.get('mobile', '')).strip()
+    upi_id = str(data.get('upi_id', '')).strip()
     role   = data.get('role', 'user')
 
     if not name or not mobile:
@@ -406,16 +415,18 @@ def update_user(uid):
         return jsonify({'error': 'Invalid role'}), 400
     if not re.match(r'^\d{10}$', mobile):
         return jsonify({'error': 'Mobile must be exactly 10 digits'}), 400
+    if upi_id and not UPI_ID_RE.match(upi_id):
+        return jsonify({'error': 'UPI ID must look like name@bank (e.g. 9876543210@ybl)'}), 400
 
     if data.get('password'):
         db_execute(
-            "UPDATE users SET name=%s, mobile=%s, role=%s, password_hash=%s WHERE id=%s",
-            (name, mobile, role, generate_password_hash(data['password']), uid)
+            "UPDATE users SET name=%s, mobile=%s, upi_id=%s, role=%s, password_hash=%s WHERE id=%s",
+            (name, mobile, upi_id or None, role, generate_password_hash(data['password']), uid)
         )
     else:
         db_execute(
-            "UPDATE users SET name=%s, mobile=%s, role=%s WHERE id=%s",
-            (name, mobile, role, uid)
+            "UPDATE users SET name=%s, mobile=%s, upi_id=%s, role=%s WHERE id=%s",
+            (name, mobile, upi_id or None, role, uid)
         )
     log.info(f'Updated user id={uid}')
     return jsonify({'success': True})
@@ -690,6 +701,9 @@ def register_family():
     mobile     = str(data.get('mobile', '')).strip()
     persons    = int(data.get('persons', 1))
     free_entry = bool(data.get('free_entry', False))
+    payment_mode = str(data.get('payment_mode', 'cash')).strip().lower()
+    if payment_mode not in ('cash', 'upi', 'free'):
+        payment_mode = 'cash'
     registered_by = session['user_id']
 
     try:
@@ -711,6 +725,8 @@ def register_family():
     rate = get_settings_row()['token_rate']
     token_amount = 0 if free_entry else persons * rate
     paid = token_amount + aarti_amount + abhishek_amount + donation_amount
+    if free_entry:
+        payment_mode = 'free'
 
     try:
         conn = get_db()
@@ -724,17 +740,17 @@ def register_family():
                 cur.execute("""
                     INSERT INTO registrations
                         (token, name, address, mobile, persons, paid, free_entry, registered_by,
-                         token_amount, aarti_amount, abhishek_amount, donation_amount)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by,
-                      token_amount, aarti_amount, abhishek_amount, donation_amount))
+                      token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode))
                 conn.commit()
         finally:
             conn.close()
 
         log.info(f'Janmashtami Registration: Token={token} Name={name} Members={persons} '
                  f'Token={token_amount} Aarti={aarti_amount} Abhishek={abhishek_amount} '
-                 f'Donation={donation_amount} Total={paid} Free={free_entry}')
+                 f'Donation={donation_amount} Total={paid} Free={free_entry} PaymentMode={payment_mode}')
         return jsonify({
             'success':         True,
             'token':           token,
@@ -746,6 +762,7 @@ def register_family():
             'abhishek_amount': abhishek_amount,
             'donation_amount': donation_amount,
             'free_entry':      free_entry,
+            'payment_mode':    payment_mode,
             'reg_at':          datetime.now().strftime('%d/%m/%Y %H:%M'),
         }), 201
     except Exception as e:
@@ -997,6 +1014,7 @@ def export_csv():
                 r.aarti_amount,
                 r.abhishek_amount,
                 r.donation_amount,
+                r.payment_mode,
                 r.free_entry,
                 r.reg_at,
                 COALESCE(u.name, 'Unknown')   AS registered_by_user,
@@ -1009,7 +1027,7 @@ def export_csv():
             ORDER BY r.id ASC
         """)
 
-        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Free Entry,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
+        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Free Entry,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
             addr   = str(r['address']).replace(',', ';').replace('\n', ' ')
             reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
@@ -1017,6 +1035,7 @@ def export_csv():
                 f"{r['token']},{r['name']},{addr},{r['mobile']},"
                 f"{r['registered_members']},{r['token_amount']},{r['aarti_amount']},"
                 f"{r['abhishek_amount']},{r['donation_amount']},{r['paid']},"
+                f"{r['payment_mode']},"
                 f"{'Yes' if r['free_entry'] else 'No'},"
                 f"{reg_at},{r['registered_by_user']},"
                 f"{r['attended']},{r['members_counted']},{r['gate_time']}"
