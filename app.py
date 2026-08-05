@@ -437,6 +437,25 @@ def delete_user(uid):
     admins = db_query("SELECT id FROM users WHERE role='admin'")
     if len(admins) == 1 and admins[0]['id'] == uid:
         return jsonify({'error': 'Cannot delete the primary admin account'}), 400
+
+    # settlements.volunteer_id cascades on delete, so removing an account with
+    # settlement history would silently erase the record of money already remitted --
+    # block it instead of letting the financial trail vanish.
+    settlement_count = db_query(
+        "SELECT COUNT(*) AS cnt FROM settlements WHERE volunteer_id = %s", (uid,), fetch='one'
+    )['cnt']
+    registration_count = db_query(
+        "SELECT COUNT(*) AS cnt FROM registrations WHERE registered_by = %s", (uid,), fetch='one'
+    )['cnt']
+    if settlement_count > 0 or registration_count > 0:
+        return jsonify({
+            'error': (
+                f'Cannot delete: this account has {registration_count} registration(s) and '
+                f'{settlement_count} settlement record(s). Deleting would destroy that financial '
+                f'history. Keep the account (they can simply stop using it) instead of removing it.'
+            )
+        }), 400
+
     db_execute("DELETE FROM users WHERE id=%s", (uid,))
     log.info(f'Deleted user id={uid}')
     return jsonify({'success': True})

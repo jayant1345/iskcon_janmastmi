@@ -850,6 +850,30 @@
             </div>
           </div>
         </div>
+
+        <!-- Settlement History (audit trail of every cash/UPI hand-over recorded) -->
+        <div id="settlement-history-section" class="glass-card hidden" style="margin-top: 1.5rem;">
+          <div class="glass-card-title">
+            <span><i class="fa-solid fa-clock-rotate-left"></i> Settlement History</span>
+            <button class="nav-tab" style="padding: 0.2rem 0.6rem;" onclick="loadSettlementHistory()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Volunteer</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                  <th>Recorded By</th>
+                </tr>
+              </thead>
+              <tbody id="settlement-history-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- ── TAB 2: REGISTER FAMILY ── -->
@@ -1323,11 +1347,13 @@
         document.getElementById('nav-users-tab').classList.remove('hidden');
         document.getElementById('stat-collection-card').classList.remove('hidden');
         document.getElementById('leaderboard-section').classList.remove('hidden');
+        document.getElementById('settlement-history-section').classList.remove('hidden');
         document.getElementById('stat-mybalance-card').classList.add('hidden');
       } else {
         document.getElementById('nav-users-tab').classList.add('hidden');
         document.getElementById('stat-collection-card').classList.add('hidden');
         document.getElementById('leaderboard-section').classList.add('hidden');
+        document.getElementById('settlement-history-section').classList.add('hidden');
         document.getElementById('stat-mybalance-card').classList.remove('hidden');
       }
 
@@ -1412,6 +1438,7 @@
           const uRes = await fetch(`${API_BASE}/api/admin/user-stats`, { credentials: 'include' });
           const uData = await uRes.json();
           renderLeaderboard(uData.user_stats);
+          loadSettlementHistory();
         } else {
           const mRes = await fetch(`${API_BASE}/api/my-stats`, { credentials: 'include' });
           const mData = await mRes.json();
@@ -1513,6 +1540,29 @@
         alert('Server error while recording payment');
       }
     });
+
+    async function loadSettlementHistory() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settlements`, { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('settlement-history-body');
+        if (!data.settlements || data.settlements.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No settlements recorded yet.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.settlements.map(s => `
+          <tr>
+            <td>${s.created_at}</td>
+            <td><strong>${s.volunteer_name}</strong> <small style="color: var(--text-muted);">(@${s.volunteer_username})</small></td>
+            <td style="color: var(--accent-gold-light); font-weight: 700;">₹${s.amount}</td>
+            <td>${s.note || '<span style="color:var(--text-muted);">&mdash;</span>'}</td>
+            <td>${s.recorded_by_name || 'Unknown'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Settlement history load error:', err);
+      }
+    }
 
     // ── REGISTER FAMILY / PRICING ──
     let pricingSettings = { token_rate: 20, aarti_price: 101, abhishek_price: 251 };
