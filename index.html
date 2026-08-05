@@ -1139,7 +1139,11 @@
               <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(239, 68, 68, 0.3);">
                 <h4 style="color: #FCA5A5; margin-bottom: 0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</h4>
                 <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Reset registration database and attendance records.</p>
-                <button class="btn-primary" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; color: #FCA5A5;" onclick="triggerClearData()">
+                <div class="form-group">
+                  <label class="form-label" style="color: #FCA5A5;">Confirmation Password</label>
+                  <input type="password" id="clear-data-password" class="form-control" placeholder="Enter confirmation password to unlock" autocomplete="off" oninput="checkClearDataPassword()">
+                </div>
+                <button id="clear-data-btn" class="btn-primary" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; color: #FCA5A5; opacity: 0.4; cursor: not-allowed; transition: opacity 0.2s;" onclick="triggerClearData()" disabled>
                   <i class="fa-solid fa-trash-can"></i> Clear All Data
                 </button>
               </div>
@@ -2379,20 +2383,34 @@
       window.open(`${API_BASE}/api/export/csv`, '_blank');
     }
 
+    const CLEAR_DATA_SECRET = 'ISKCON_JANMASTMI_CLEAR_2026';
+
+    function checkClearDataPassword() {
+      const input = document.getElementById('clear-data-password');
+      const btn = document.getElementById('clear-data-btn');
+      const unlocked = input.value === CLEAR_DATA_SECRET;
+      btn.disabled = !unlocked;
+      btn.style.opacity = unlocked ? '1' : '0.4';
+      btn.style.cursor = unlocked ? 'pointer' : 'not-allowed';
+    }
+
     async function triggerClearData() {
-      const code = prompt('DANGER: Type confirmation code "ISKCON_JANMASTMI_CLEAR_2026" to reset all data:');
-      if (code !== 'ISKCON_JANMASTMI_CLEAR_2026') return alert('Invalid code. Operation cancelled.');
+      const input = document.getElementById('clear-data-password');
+      if (input.value !== CLEAR_DATA_SECRET) return; // button should be disabled in this case anyway
+      if (!confirm('This will permanently erase ALL registrations and attendance records. This cannot be undone. Continue?')) return;
 
       try {
         const res = await fetch(`${API_BASE}/api/admin/clear`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ secret: code })
+          body: JSON.stringify({ secret: input.value })
         });
         const data = await res.json();
         if (res.ok && data.success) {
           alert('All registration & attendance data cleared.');
+          input.value = '';
+          checkClearDataPassword();
           loadDashboardStats();
         } else {
           alert('Clear failed: ' + (data.error || 'Error'));
