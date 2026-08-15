@@ -1254,6 +1254,35 @@
     </div>
   </div>
 
+  <!-- ── COLLECT PENDING ONLINE REGISTRATION PAYMENT MODAL ── -->
+  <div id="collect-payment-modal" class="modal-overlay">
+    <div class="token-card">
+      <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">Collect Pending Payment</h4>
+      <h2 id="collect-payment-name" style="color: white; font-size: 1.25rem; font-weight: 700;">Family Name</h2>
+      <p id="collect-payment-token" style="color: var(--text-muted); font-size: 0.85rem;"></p>
+      <div class="token-number" id="collect-payment-amount" style="margin-top: 0.75rem;">₹0</div>
+
+      <div id="collect-payment-qr-section" style="margin-top: 1rem;">
+        <div class="qr-container">
+          <div id="collect-payment-qrcode"></div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Ask the family to scan with any UPI app to pay this amount directly to you.</p>
+      </div>
+      <p id="collect-payment-no-upi-msg" class="hidden" style="color: #FBBF24; font-size: 0.85rem; margin-top: 1rem;">
+        <i class="fa-solid fa-triangle-exclamation"></i> No UPI ID is set on your account &mdash; ask the admin to add one (Volunteers &amp; Admin tab) if you want to accept UPI payments. You can still collect cash.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.25rem;">
+        <button id="collect-payment-upi-btn" class="btn-primary" style="background: #25D366; color: white;" onclick="confirmCollectPayment('upi')">
+          <i class="fa-solid fa-circle-check"></i> Payment Received via UPI
+        </button>
+        <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closeCollectPaymentModal()">
+          <i class="fa-solid fa-arrow-left"></i> Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── SETTLEMENT (CASH/UPI REMITTANCE) MODAL ── -->
   <div id="settlement-modal" class="modal-overlay">
     <div class="token-card">
@@ -2236,10 +2265,12 @@
     function paidCellHtml(r) {
       if (r.free_entry) return '<span class="badge badge-warning">FREE PASS</span>';
       if (r.payment_mode === 'pending') {
+        const amount = r.token_amount + r.aarti_amount + r.abhishek_amount + r.donation_amount;
+        const safeName = String(r.name || '').replace(/'/g, "\\'");
         return `<span class="badge badge-warning">Payment Pending</span>
           <div style="display:flex; gap:0.3rem; margin-top:0.35rem;">
             <button onclick="collectPayment('${r.token}','cash')" style="font-size:0.7rem; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid var(--accent-gold); background:rgba(245,158,11,0.15); color:var(--accent-gold-light); cursor:pointer; font-weight:600;">Collect Cash</button>
-            <button onclick="collectPayment('${r.token}','upi')" style="font-size:0.7rem; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid var(--accent-peacock); background:rgba(0,229,255,0.15); color:var(--accent-peacock); cursor:pointer; font-weight:600;">Collect UPI</button>
+            <button onclick="openCollectPaymentModal('${r.token}', ${amount}, '${safeName}')" style="font-size:0.7rem; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid var(--accent-peacock); background:rgba(0,229,255,0.15); color:var(--accent-peacock); cursor:pointer; font-weight:600;">Collect UPI</button>
           </div>`;
       }
       if (r.payment_mode === 'razorpay') {
@@ -2290,6 +2321,61 @@
           alert(data.error || 'Could not record payment.');
           return;
         }
+        loadRegistrations();
+      } catch (err) {
+        alert('Could not reach the server.');
+      }
+    }
+
+    let collectPaymentTarget = null;
+
+    function openCollectPaymentModal(token, amount, name) {
+      collectPaymentTarget = { token, amount };
+      document.getElementById('collect-payment-name').textContent = name;
+      document.getElementById('collect-payment-token').textContent = `Token ${token}`;
+      document.getElementById('collect-payment-amount').textContent = `₹${amount}`;
+
+      const upiId = currentUser && currentUser.upi_id;
+      const qrSection = document.getElementById('collect-payment-qr-section');
+      const noUpiMsg = document.getElementById('collect-payment-no-upi-msg');
+      const qrContainer = document.getElementById('collect-payment-qrcode');
+      qrContainer.innerHTML = '';
+      const upiBtn = document.getElementById('collect-payment-upi-btn');
+      if (upiId) {
+        qrSection.classList.remove('hidden');
+        noUpiMsg.classList.add('hidden');
+        upiBtn.classList.remove('hidden');
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(currentUser.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent('ISKCON Janmashtami - ' + name)}`;
+        new QRCode(qrContainer, { text: upiUrl, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
+      } else {
+        qrSection.classList.add('hidden');
+        noUpiMsg.classList.remove('hidden');
+        upiBtn.classList.add('hidden');
+      }
+
+      document.getElementById('collect-payment-modal').classList.add('active');
+    }
+
+    function closeCollectPaymentModal() {
+      document.getElementById('collect-payment-modal').classList.remove('active');
+      collectPaymentTarget = null;
+    }
+
+    async function confirmCollectPayment(mode) {
+      if (!collectPaymentTarget) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/registrations/${collectPaymentTarget.token}/collect-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ payment_mode: mode }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Could not record payment.');
+          return;
+        }
+        closeCollectPaymentModal();
         loadRegistrations();
       } catch (err) {
         alert('Could not reach the server.');
