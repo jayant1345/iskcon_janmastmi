@@ -101,6 +101,7 @@ def init_db():
                     persons       INT          NOT NULL DEFAULT 1,
                     paid          INT          NOT NULL DEFAULT 0,
                     free_entry    TINYINT(1)   NOT NULL DEFAULT 0,
+                    category      VARCHAR(10)  NOT NULL DEFAULT 'volunteer',
                     registered_by INT          NULL,
                     reg_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_token (token),
@@ -181,6 +182,7 @@ def init_db():
                 ('registrations', 'abhishek_amount',    "ALTER TABLE registrations ADD COLUMN abhishek_amount INT NOT NULL DEFAULT 0"),
                 ('registrations', 'donation_amount',    "ALTER TABLE registrations ADD COLUMN donation_amount INT NOT NULL DEFAULT 0"),
                 ('registrations', 'payment_mode',       "ALTER TABLE registrations ADD COLUMN payment_mode VARCHAR(10) NOT NULL DEFAULT 'cash'"),
+                ('registrations', 'category',            "ALTER TABLE registrations ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT 'volunteer'"),
                 ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
                 ('users',         'upi_id',              "ALTER TABLE users ADD COLUMN upi_id VARCHAR(100) NULL"),
             ]
@@ -276,6 +278,10 @@ def admin_required(f):
 @app.route('/index.html')
 def serve_frontend():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+
+@app.route('/register')
+def serve_public_register():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'register.html')
 
 @app.route('/<path:filename>')
 def serve_static_file(filename):
@@ -708,22 +714,16 @@ def list_registrations():
         log.error(f'list_registrations error: {e}')
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/register', methods=['POST'])
-@login_required
-def register_family():
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'No payload submitted'}), 400
-
+def _create_registration(data, registered_by, category):
     name       = str(data.get('name', '')).strip()
     address    = str(data.get('address', '')).strip()
     mobile     = str(data.get('mobile', '')).strip()
     persons    = int(data.get('persons', 1))
     free_entry = bool(data.get('free_entry', False))
     payment_mode = str(data.get('payment_mode', 'cash')).strip().lower()
-    if payment_mode not in ('cash', 'upi', 'free'):
-        payment_mode = 'cash'
-    registered_by = session['user_id']
+    allowed_modes = ('cash', 'upi', 'free') if category == 'volunteer' else ('pending', 'upi', 'free')
+    if payment_mode not in allowed_modes:
+        payment_mode = allowed_modes[0]
 
     try:
         aarti_amount    = max(0, int(data.get('aarti_amount', 0) or 0))
@@ -743,9 +743,12 @@ def register_family():
     # admin-configured rate, so the charge can't be tampered with in the request body.
     rate = get_settings_row()['token_rate']
     token_amount = 0 if free_entry else persons * rate
-    paid = token_amount + aarti_amount + abhishek_amount + donation_amount
     if free_entry:
         payment_mode = 'free'
+    # Online self-registrations aren't collected at the counter yet -- payment is settled
+    # later once the payment number/QR is shared, so nothing is recorded as "paid" here.
+    # It stays informational (token_amount) rather than feeding the collection totals.
+    paid = 0 if payment_mode == 'pending' else (token_amount + aarti_amount + abhishek_amount + donation_amount)
 
     try:
         conn = get_db()
@@ -758,16 +761,16 @@ def register_family():
 
                 cur.execute("""
                     INSERT INTO registrations
-                        (token, name, address, mobile, persons, paid, free_entry, registered_by,
+                        (token, name, address, mobile, persons, paid, free_entry, registered_by, category,
                          token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by, category,
                       token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode))
                 conn.commit()
         finally:
             conn.close()
 
-        log.info(f'Janmashtami Registration: Token={token} Name={name} Members={persons} '
+        log.info(f'Janmashtami Registration: Token={token} Name={name} Members={persons} Category={category} '
                  f'Token={token_amount} Aarti={aarti_amount} Abhishek={abhishek_amount} '
                  f'Donation={donation_amount} Total={paid} Free={free_entry} PaymentMode={payment_mode}')
         return jsonify({
@@ -782,11 +785,36 @@ def register_family():
             'donation_amount': donation_amount,
             'free_entry':      free_entry,
             'payment_mode':    payment_mode,
+            'category':        category,
             'reg_at':          datetime.now().strftime('%d/%m/%Y %H:%M'),
         }), 201
     except Exception as e:
         log.error(f'register error: {e}')
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/register', methods=['POST'])
+@login_required
+def register_family():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No payload submitted'}), 400
+    return _create_registration(data, registered_by=session['user_id'], category='volunteer')
+
+@app.route('/api/register/public', methods=['POST'])
+def register_public():
+    """Public, no-login self-registration -- reachable via the /register QR code.
+    Payment is deferred (payment number to be shared later), so it always lands as
+    category='online' with payment_mode='pending' and registered_by=NULL."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No payload submitted'}), 400
+    data = dict(data)
+    data['free_entry'] = False
+    data['payment_mode'] = 'pending'
+    data['aarti_amount'] = 0
+    data['abhishek_amount'] = 0
+    data['donation_amount'] = 0
+    return _create_registration(data, registered_by=None, category='online')
 
 # ============================================================
 #  ATTENDANCE & GATE GATEWAY
@@ -1035,6 +1063,7 @@ def export_csv():
                 r.donation_amount,
                 r.payment_mode,
                 r.free_entry,
+                r.category,
                 r.reg_at,
                 COALESCE(u.name, 'Unknown')   AS registered_by_user,
                 IF(a.token IS NOT NULL,'Yes','No') AS attended,
@@ -1046,7 +1075,7 @@ def export_csv():
             ORDER BY r.id ASC
         """)
 
-        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Free Entry,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
+        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Free Entry,Category,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
             addr   = str(r['address']).replace(',', ';').replace('\n', ' ')
             reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
@@ -1056,6 +1085,7 @@ def export_csv():
                 f"{r['abhishek_amount']},{r['donation_amount']},{r['paid']},"
                 f"{r['payment_mode']},"
                 f"{'Yes' if r['free_entry'] else 'No'},"
+                f"{r['category']},"
                 f"{reg_at},{r['registered_by_user']},"
                 f"{r['attended']},{r['members_counted']},{r['gate_time']}"
             )

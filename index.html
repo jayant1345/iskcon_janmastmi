@@ -1011,7 +1011,14 @@
         <div class="glass-card">
           <div class="glass-card-title">
             <span><i class="fa-solid fa-list"></i> Devotee Family Registrations</span>
-            <input type="text" id="reg-search" class="form-control" placeholder="Search by name, token, mobile..." style="width: 260px; font-size: 0.85rem;" onkeyup="filterRegistrationsTable()">
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <select id="reg-category-filter" class="form-control" style="width: 170px; font-size: 0.85rem;" onchange="filterRegistrationsTable()">
+                <option value="">All Categories</option>
+                <option value="volunteer">Volunteer-Registered</option>
+                <option value="online">Online (Self)</option>
+              </select>
+              <input type="text" id="reg-search" class="form-control" placeholder="Search by name, token, mobile..." style="width: 260px; font-size: 0.85rem;" onkeyup="filterRegistrationsTable()">
+            </div>
           </div>
 
           <div class="table-responsive">
@@ -1024,6 +1031,7 @@
                   <th>Address</th>
                   <th>Members</th>
                   <th>Paid</th>
+                  <th>Category</th>
                   <th>Registered By</th>
                   <th>Status</th>
                 </tr>
@@ -2231,14 +2239,15 @@
         const data = await res.json();
         const tbody = document.getElementById('registrations-table-body');
         tbody.innerHTML = data.registrations.map(r => `
-          <tr>
+          <tr data-category="${r.category || 'volunteer'}">
             <td><strong style="color: var(--accent-gold-light);">${r.token}</strong></td>
             <td>${r.name}</td>
             <td>${r.mobile}</td>
             <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.address}</td>
             <td>${r.persons}</td>
-            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : '₹' + r.paid}</td>
-            <td>${r.registered_by_name || 'System'}</td>
+            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : (r.payment_mode === 'pending' ? '<span class="badge badge-warning">Payment Pending</span>' : '₹' + r.paid)}</td>
+            <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>'}</td>
+            <td>${r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System')}</td>
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
             </td>
@@ -2251,10 +2260,13 @@
 
     function filterRegistrationsTable() {
       const q = document.getElementById('reg-search').value.toLowerCase();
+      const cat = document.getElementById('reg-category-filter').value;
       const rows = document.querySelectorAll('#registrations-table-body tr');
       rows.forEach(r => {
         const text = r.textContent.toLowerCase();
-        r.style.display = text.includes(q) ? '' : 'none';
+        const matchesText = text.includes(q);
+        const matchesCat = !cat || r.dataset.category === cat;
+        r.style.display = (matchesText && matchesCat) ? '' : 'none';
       });
     }
 

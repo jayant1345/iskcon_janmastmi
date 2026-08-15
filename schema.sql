@@ -36,9 +36,10 @@ CREATE TABLE IF NOT EXISTS registrations (
     aarti_amount     INT          NOT NULL DEFAULT 0, -- Optional Aarti seva amount
     abhishek_amount  INT          NOT NULL DEFAULT 0, -- Optional Abhishek seva amount
     donation_amount  INT          NOT NULL DEFAULT 0, -- Optional donation, 80G receipt issued separately
-    payment_mode     VARCHAR(10)  NOT NULL DEFAULT 'cash', -- 'cash', 'upi', or 'free' -- how payment was confirmed
+    payment_mode     VARCHAR(10)  NOT NULL DEFAULT 'cash', -- 'cash', 'upi', 'free', or 'pending' -- how payment was confirmed
     free_entry       TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag (zeroes token_amount only)
-    registered_by    INT          NULL,               -- FK to users.id
+    category         VARCHAR(10)  NOT NULL DEFAULT 'volunteer', -- 'volunteer' (staff-entered) or 'online' (public self-registration)
+    registered_by    INT          NULL,               -- FK to users.id, NULL for online self-registrations
     reg_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_token (token),
     INDEX idx_mobile (mobile),

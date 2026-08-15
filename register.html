@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪈 ISKCON Janmashtami 2026 — Online Registration</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root {
+      --bg-dark: #030D22;
+      --bg-card: rgba(8, 28, 62, 0.78);
+      --border-gold: rgba(251, 191, 36, 0.35);
+      --border-peacock: rgba(0, 229, 255, 0.3);
+      --accent-gold: #F59E0B;
+      --accent-gold-light: #FBBF24;
+      --accent-peacock: #00E5FF;
+      --grad-gold: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+      --grad-peacock-btn: linear-gradient(135deg, #00C6FF 0%, #0072FF 50%, #7C3AED 100%);
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --danger: #EF4444;
+      --glass-shadow: 0 20px 40px rgba(0, 229, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
+    body {
+      background-color: var(--bg-dark);
+      background-image: linear-gradient(180deg, rgba(3, 13, 34, 0.55) 0%, rgba(2, 6, 23, 0.75) 100%), url('dancing_peacock.jpg');
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem 3rem;
+    }
+    .page-header { text-align: center; margin: 1.5rem 0 2rem; }
+    .page-header img { height: 64px; filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.6)); }
+    .page-header h1 { font-size: 1.5rem; margin-top: 0.75rem; background: var(--grad-gold); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .page-header p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.35rem; }
+
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-peacock);
+      border-radius: 20px;
+      padding: 1.75rem;
+      box-shadow: var(--glass-shadow);
+      width: 100%;
+      max-width: 480px;
+    }
+    .form-group { margin-bottom: 1.1rem; }
+    .form-label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
+    .form-control {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      background: rgba(3, 13, 34, 0.7);
+      border: 1px solid var(--border-peacock);
+      border-radius: 12px;
+      color: white;
+      font-size: 16px;
+    }
+    .form-control:focus { outline: none; border-color: var(--accent-peacock); box-shadow: 0 0 20px rgba(0, 229, 255, 0.35); }
+    .counter-btn-group { display: flex; align-items: center; gap: 0.5rem; }
+    .counter-btn {
+      width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--border-peacock);
+      background: rgba(0, 229, 255, 0.1); color: var(--accent-peacock); font-size: 1.3rem; font-weight: 700; cursor: pointer;
+    }
+    .counter-btn:hover { background: var(--accent-peacock); color: #030D22; }
+    .btn-primary {
+      background: var(--grad-peacock-btn); color: white; font-weight: 700; font-size: 1rem;
+      padding: 0.9rem 1.8rem; border-radius: 12px; border: none; cursor: pointer; width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.5rem;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0, 229, 255, 0.6); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .note-box {
+      background: rgba(245, 158, 11, 0.1); border: 1px solid var(--border-gold); border-radius: 12px;
+      padding: 0.85rem 1rem; font-size: 0.8rem; color: var(--accent-gold-light); margin-bottom: 1.25rem; line-height: 1.5;
+    }
+    .error-box {
+      background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px;
+      padding: 0.75rem 1rem; font-size: 0.85rem; color: #FCA5A5; margin-bottom: 1rem;
+    }
+    .hidden { display: none !important; }
+
+    .token-card { text-align: center; }
+    .token-card i.fa-circle-check { font-size: 2.5rem; color: #34D399; margin-bottom: 0.75rem; }
+    .token-number {
+      font-size: 3.2rem; font-weight: 900; letter-spacing: 2px;
+      background: var(--grad-gold); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin: 0.35rem 0;
+    }
+    .token-card .name { font-size: 1.1rem; font-weight: 600; }
+    .token-card .meta { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
+    footer { margin-top: 2rem; color: var(--text-muted); font-size: 0.78rem; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <img src="iskcon_logo_icon.png" alt="ISKCON Symbol">
+    <h1>Janmashtami 2026 — Online Registration</h1>
+    <p>Register your family directly — no volunteer needed.</p>
+  </div>
+
+  <div class="glass-card" id="form-card">
+    <div class="note-box">
+      <i class="fa-solid fa-circle-info"></i>
+      This reserves your family's entry token now. Payment details (UPI / counter) will be shared with you soon — no payment is needed to complete this registration.
+    </div>
+
+    <div id="error-box" class="error-box hidden"></div>
+
+    <form id="public-register-form">
+      <div class="form-group">
+        <label class="form-label">Head of Family Name *</label>
+        <input type="text" id="reg-name" class="form-control" placeholder="e.g. Ramesh Sharma" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Mobile Number (10 digits) *</label>
+        <input type="tel" id="reg-mobile" class="form-control" placeholder="e.g. 9876543210" pattern="[0-9]{10}" maxlength="10" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Full Address *</label>
+        <textarea id="reg-address" class="form-control" rows="2" placeholder="Street address, city" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Total Family Members *</label>
+        <div class="counter-btn-group">
+          <button type="button" class="counter-btn" onclick="updatePersons(-1)">-</button>
+          <input type="number" id="reg-persons" class="form-control" value="1" min="1" max="50" style="text-align: center;" readonly>
+          <button type="button" class="counter-btn" onclick="updatePersons(1)">+</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="submit-btn">
+        <i class="fa-solid fa-ticket"></i> Register My Family
+      </button>
+    </form>
+  </div>
+
+  <div class="glass-card token-card hidden" id="success-card">
+    <i class="fa-solid fa-circle-check"></i>
+    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Registration Confirmed</div>
+    <div class="token-number" id="result-token">000</div>
+    <div class="name" id="result-name"></div>
+    <div class="meta" id="result-meta"></div>
+    <div class="note-box" style="margin-top: 1.25rem; text-align: left;">
+      <i class="fa-solid fa-circle-info"></i>
+      Please save this token number. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show this token (or your registered mobile number) at the gate on the day of the event.
+    </div>
+    <button type="button" class="btn-primary" onclick="registerAnother()">
+      <i class="fa-solid fa-rotate-left"></i> Register Another Family
+    </button>
+  </div>
+
+  <footer>🪈 Jai Shri Krishna — ISKCON Janmashtami 2026 🪈</footer>
+
+  <script>
+    function updatePersons(delta) {
+      const input = document.getElementById('reg-persons');
+      let val = parseInt(input.value, 10) || 1;
+      val = Math.min(50, Math.max(1, val + delta));
+      input.value = val;
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('error-box');
+      box.textContent = msg;
+      box.classList.remove('hidden');
+    }
+    function clearError() {
+      document.getElementById('error-box').classList.add('hidden');
+    }
+
+    function registerAnother() {
+      document.getElementById('public-register-form').reset();
+      document.getElementById('reg-persons').value = 1;
+      document.getElementById('success-card').classList.add('hidden');
+      document.getElementById('form-card').classList.remove('hidden');
+      clearError();
+    }
+
+    document.getElementById('public-register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+
+      const payload = {
+        name: document.getElementById('reg-name').value.trim(),
+        mobile: document.getElementById('reg-mobile').value.trim(),
+        address: document.getElementById('reg-address').value.trim(),
+        persons: parseInt(document.getElementById('reg-persons').value, 10) || 1,
+      };
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registering...';
+
+      try {
+        const res = await fetch('/api/register/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'Registration failed. Please try again.');
+          return;
+        }
+
+        document.getElementById('result-token').textContent = data.token;
+        document.getElementById('result-name').textContent = data.name;
+        document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''}`;
+        document.getElementById('form-card').classList.add('hidden');
+        document.getElementById('success-card').classList.remove('hidden');
+      } catch (err) {
+        showError('Could not reach the server. Please check your connection and try again.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Register My Family';
+      }
+    });
+  </script>
+</body>
+</html>
