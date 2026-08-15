@@ -2462,6 +2462,9 @@
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          if (currentUser && currentUser.id === uid) {
+            currentUser.upi_id = newUpi.trim() || null;
+          }
           loadUsersList();
         } else {
           alert('Failed to update UPI ID: ' + (data.error || 'Error'));
