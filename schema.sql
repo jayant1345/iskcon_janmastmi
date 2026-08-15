@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS registrations (
     aarti_amount     INT          NOT NULL DEFAULT 0, -- Optional Aarti seva amount
     abhishek_amount  INT          NOT NULL DEFAULT 0, -- Optional Abhishek seva amount
     donation_amount  INT          NOT NULL DEFAULT 0, -- Optional donation, 80G receipt issued separately
-    payment_mode     VARCHAR(10)  NOT NULL DEFAULT 'cash', -- 'cash', 'upi', 'free', or 'pending' -- how payment was confirmed
+    payment_mode     VARCHAR(10)  NOT NULL DEFAULT 'cash', -- 'cash', 'upi', 'free', 'pending', or 'razorpay' -- how payment was confirmed
+    payment_ref      VARCHAR(64)  NULL,                -- Razorpay payment ID (or other gateway reference), for reconciliation
     free_entry       TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag (zeroes token_amount only)
     category         VARCHAR(10)  NOT NULL DEFAULT 'volunteer', -- 'volunteer' (staff-entered) or 'online' (public self-registration)
     registered_by    INT          NULL,               -- FK to users.id, NULL for online self-registrations

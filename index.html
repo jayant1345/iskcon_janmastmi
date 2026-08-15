@@ -2245,7 +2245,7 @@
             <td>${r.mobile}</td>
             <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.address}</td>
             <td>${r.persons}</td>
-            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : (r.payment_mode === 'pending' ? '<span class="badge badge-warning">Payment Pending</span>' : '₹' + r.paid)}</td>
+            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : (r.payment_mode === 'pending' ? '<span class="badge badge-warning">Payment Pending</span>' : (r.payment_mode === 'razorpay' ? `<span class="badge badge-success" title="${r.payment_ref || ''}"><i class="fa-solid fa-circle-check"></i> ₹${r.paid} (Razorpay)</span>` : '₹' + r.paid))}</td>
             <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>'}</td>
             <td>${r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System')}</td>
             <td>

@@ -14,8 +14,17 @@ import pymysql
 import pymysql.cursors
 from datetime import datetime, timedelta
 import logging
+import razorpay
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+
+# ── RAZORPAY (online self-registration payment) ──
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+razorpay_client = (
+    razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET else None
+)
 
 # ── SECRET KEY & SESSION CONFIG ──
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -102,6 +111,7 @@ def init_db():
                     paid          INT          NOT NULL DEFAULT 0,
                     free_entry    TINYINT(1)   NOT NULL DEFAULT 0,
                     category      VARCHAR(10)  NOT NULL DEFAULT 'volunteer',
+                    payment_ref   VARCHAR(64)  NULL,
                     registered_by INT          NULL,
                     reg_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_token (token),
@@ -183,6 +193,7 @@ def init_db():
                 ('registrations', 'donation_amount',    "ALTER TABLE registrations ADD COLUMN donation_amount INT NOT NULL DEFAULT 0"),
                 ('registrations', 'payment_mode',       "ALTER TABLE registrations ADD COLUMN payment_mode VARCHAR(10) NOT NULL DEFAULT 'cash'"),
                 ('registrations', 'category',            "ALTER TABLE registrations ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT 'volunteer'"),
+                ('registrations', 'payment_ref',          "ALTER TABLE registrations ADD COLUMN payment_ref VARCHAR(64) NULL"),
                 ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
                 ('users',         'upi_id',              "ALTER TABLE users ADD COLUMN upi_id VARCHAR(100) NULL"),
             ]
@@ -721,7 +732,8 @@ def _create_registration(data, registered_by, category):
     persons    = int(data.get('persons', 1))
     free_entry = bool(data.get('free_entry', False))
     payment_mode = str(data.get('payment_mode', 'cash')).strip().lower()
-    allowed_modes = ('cash', 'upi', 'free') if category == 'volunteer' else ('pending', 'upi', 'free')
+    payment_ref  = str(data.get('payment_ref', '') or '').strip()[:64] or None
+    allowed_modes = ('cash', 'upi', 'free') if category == 'volunteer' else ('razorpay', 'pending', 'free')
     if payment_mode not in allowed_modes:
         payment_mode = allowed_modes[0]
 
@@ -762,10 +774,10 @@ def _create_registration(data, registered_by, category):
                 cur.execute("""
                     INSERT INTO registrations
                         (token, name, address, mobile, persons, paid, free_entry, registered_by, category,
-                         token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode, payment_ref)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (token, name, address, mobile, persons, paid, int(free_entry), registered_by, category,
-                      token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode))
+                      token_amount, aarti_amount, abhishek_amount, donation_amount, payment_mode, payment_ref))
                 conn.commit()
         finally:
             conn.close()
@@ -800,17 +812,95 @@ def register_family():
         return jsonify({'error': 'No payload submitted'}), 400
     return _create_registration(data, registered_by=session['user_id'], category='volunteer')
 
+@app.route('/api/razorpay/order', methods=['POST'])
+def create_razorpay_order():
+    """Public, no-login -- creates a Razorpay order for the token amount of an
+    online self-registration, ahead of opening the Checkout popup."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not configured yet'}), 503
+
+    data = request.get_json() or {}
+    try:
+        persons = int(data.get('persons', 1))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid members count'}), 400
+    if persons < 1 or persons > 50:
+        return jsonify({'error': 'Members count must be between 1 and 50'}), 400
+
+    rate = get_settings_row()['token_rate']
+    amount_paise = persons * rate * 100
+    if amount_paise <= 0:
+        return jsonify({'error': 'Nothing to pay'}), 400
+
+    try:
+        order = razorpay_client.order.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'payment_capture': 1,
+            'notes': {
+                'event': 'ISKCON Janmashtami 2026 Online Registration',
+                'name': str(data.get('name', '')).strip()[:100],
+                'mobile': str(data.get('mobile', '')).strip()[:15],
+                'persons': persons,
+            },
+        })
+        return jsonify({'order_id': order['id'], 'amount': amount_paise, 'currency': 'INR', 'key_id': RAZORPAY_KEY_ID})
+    except Exception as e:
+        log.error(f'razorpay order create error: {e}')
+        return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
 @app.route('/api/register/public', methods=['POST'])
 def register_public():
     """Public, no-login self-registration -- reachable via the /register QR code.
-    Payment is deferred (payment number to be shared later), so it always lands as
-    category='online' with payment_mode='pending' and registered_by=NULL."""
+    Payment happens up front via Razorpay Checkout; the token is only created once
+    the payment signature is verified and the captured amount matches what's owed,
+    so registered_by stays NULL and category is always 'online'."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not configured yet'}), 503
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No payload submitted'}), 400
+
+    order_id   = str(data.get('razorpay_order_id', '')).strip()
+    payment_id = str(data.get('razorpay_payment_id', '')).strip()
+    signature  = str(data.get('razorpay_signature', '')).strip()
+    if not order_id or not payment_id or not signature:
+        return jsonify({'error': 'Payment verification data missing'}), 400
+
+    try:
+        razorpay_client.utility.verify_payment_signature({
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature,
+        })
+    except razorpay.errors.SignatureVerificationError:
+        log.error(f'Razorpay signature verification failed for order {order_id}')
+        return jsonify({'error': 'Payment verification failed'}), 400
+
+    try:
+        order = razorpay_client.order.fetch(order_id)
+    except Exception as e:
+        log.error(f'razorpay order fetch error: {e}')
+        return jsonify({'error': 'Could not verify payment. Please contact support with your payment ID.'}), 500
+
+    try:
+        persons = int(data.get('persons', 1))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid members count'}), 400
+    rate = get_settings_row()['token_rate']
+    expected_amount = max(1, min(50, persons)) * rate * 100
+
+    # The amount actually captured by Razorpay is the source of truth -- never trust
+    # persons/amount fields from the request body for what gets charged.
+    if order.get('status') != 'paid' or order.get('amount_paid') != expected_amount:
+        log.error(f'Razorpay amount/status mismatch: order={order} expected={expected_amount}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
     data = dict(data)
     data['free_entry'] = False
-    data['payment_mode'] = 'pending'
+    data['payment_mode'] = 'razorpay'
+    data['payment_ref'] = payment_id
     data['aarti_amount'] = 0
     data['abhishek_amount'] = 0
     data['donation_amount'] = 0
@@ -1062,6 +1152,7 @@ def export_csv():
                 r.abhishek_amount,
                 r.donation_amount,
                 r.payment_mode,
+                r.payment_ref,
                 r.free_entry,
                 r.category,
                 r.reg_at,
@@ -1075,7 +1166,7 @@ def export_csv():
             ORDER BY r.id ASC
         """)
 
-        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Free Entry,Category,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
+        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Payment Reference,Free Entry,Category,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
             addr   = str(r['address']).replace(',', ';').replace('\n', ' ')
             reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
@@ -1084,6 +1175,7 @@ def export_csv():
                 f"{r['registered_members']},{r['token_amount']},{r['aarti_amount']},"
                 f"{r['abhishek_amount']},{r['donation_amount']},{r['paid']},"
                 f"{r['payment_mode']},"
+                f"{r['payment_ref'] or ''},"
                 f"{'Yes' if r['free_entry'] else 'No'},"
                 f"{r['category']},"
                 f"{reg_at},{r['registered_by_user']},"

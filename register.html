@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
   <style>
     :root {
@@ -115,7 +116,7 @@
   <div class="glass-card" id="form-card">
     <div class="note-box">
       <i class="fa-solid fa-circle-info"></i>
-      This reserves your family's entry token now. Payment details (UPI / counter) will be shared with you soon — no payment is needed to complete this registration.
+      Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).
     </div>
 
     <div id="error-box" class="error-box hidden"></div>
@@ -146,7 +147,7 @@
       </div>
 
       <button type="submit" class="btn-primary" id="submit-btn">
-        <i class="fa-solid fa-ticket"></i> Register My Family
+        <i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register
       </button>
     </form>
   </div>
@@ -159,7 +160,7 @@
     <div class="meta" id="result-meta"></div>
     <div class="note-box" style="margin-top: 1.25rem; text-align: left;">
       <i class="fa-solid fa-circle-info"></i>
-      Please save this token number. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show this token (or your registered mobile number) at the gate on the day of the event.
+      Payment received. Please save this token number and show it (or your registered mobile number) at the gate on the day of the event.
     </div>
     <button type="button" class="btn-primary" onclick="registerAnother()">
       <i class="fa-solid fa-rotate-left"></i> Register Another Family
@@ -193,6 +194,12 @@
       clearError();
     }
 
+    function resetSubmitBtn() {
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register';
+    }
+
     document.getElementById('public-register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       clearError();
@@ -206,31 +213,78 @@
 
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registering...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing payment...';
 
+      let order;
       try {
-        const res = await fetch('/api/register/public', {
+        const orderRes = await fetch('/api/razorpay/order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          showError(data.error || 'Registration failed. Please try again.');
+        order = await orderRes.json();
+        if (!orderRes.ok) {
+          showError(order.error || 'Could not start payment. Please try again.');
+          resetSubmitBtn();
           return;
         }
-
-        document.getElementById('result-token').textContent = data.token;
-        document.getElementById('result-name').textContent = data.name;
-        document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''}`;
-        document.getElementById('form-card').classList.add('hidden');
-        document.getElementById('success-card').classList.remove('hidden');
       } catch (err) {
         showError('Could not reach the server. Please check your connection and try again.');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Register My Family';
+        resetSubmitBtn();
+        return;
       }
+
+      const rzp = new Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: 'ISKCON Janmashtami 2026',
+        description: `Entry token — ${payload.persons} family member${payload.persons > 1 ? 's' : ''}`,
+        image: 'iskcon_logo_icon.png',
+        prefill: { name: payload.name, contact: payload.mobile },
+        theme: { color: '#F59E0B' },
+        handler: async function (response) {
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Confirming registration...';
+          try {
+            const res = await fetch('/api/register/public', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...payload,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              showError((data.error || 'Registration failed after payment.') + ' Your payment ID: ' + response.razorpay_payment_id + ' — please save this and contact us.');
+              resetSubmitBtn();
+              return;
+            }
+
+            document.getElementById('result-token').textContent = data.token;
+            document.getElementById('result-name').textContent = data.name;
+            document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''} · ₹${data.paid} paid`;
+            document.getElementById('form-card').classList.add('hidden');
+            document.getElementById('success-card').classList.remove('hidden');
+          } catch (err) {
+            showError('Payment succeeded but we could not reach the server to confirm your token. Your payment ID: ' + response.razorpay_payment_id + ' — please save this and contact us.');
+            resetSubmitBtn();
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            resetSubmitBtn();
+          },
+        },
+      });
+      rzp.on('payment.failed', function (response) {
+        showError('Payment failed: ' + (response.error && response.error.description ? response.error.description : 'Please try again.'));
+        resetSubmitBtn();
+      });
+      rzp.open();
     });
   </script>
 </body>

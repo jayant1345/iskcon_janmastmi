@@ -4,3 +4,4 @@ pymysql
 cryptography
 gunicorn
 werkzeug
+razorpay
