@@ -117,6 +117,7 @@ def init_db():
                     category      VARCHAR(10)  NOT NULL DEFAULT 'volunteer',
                     payment_ref   VARCHAR(64)  NULL,
                     registered_by INT          NULL,
+                    collected_by  INT          NULL,
                     reg_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_token (token),
                     INDEX idx_mobile (mobile),
@@ -198,6 +199,7 @@ def init_db():
                 ('registrations', 'payment_mode',       "ALTER TABLE registrations ADD COLUMN payment_mode VARCHAR(10) NOT NULL DEFAULT 'cash'"),
                 ('registrations', 'category',            "ALTER TABLE registrations ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT 'volunteer'"),
                 ('registrations', 'payment_ref',          "ALTER TABLE registrations ADD COLUMN payment_ref VARCHAR(64) NULL"),
+                ('registrations', 'collected_by',         "ALTER TABLE registrations ADD COLUMN collected_by INT NULL"),
                 ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
                 ('users',         'upi_id',              "ALTER TABLE users ADD COLUMN upi_id VARCHAR(100) NULL"),
             ]
@@ -713,10 +715,12 @@ def list_registrations():
                    IF(a.token IS NOT NULL, 1, 0) AS attended,
                    a.gate_time,
                    u.name AS registered_by_name,
-                   u.username AS registered_by_username
+                   u.username AS registered_by_username,
+                   c.name AS collected_by_name
             FROM registrations r
             LEFT JOIN attendance a ON r.token = a.token
             LEFT JOIN users u ON u.id = r.registered_by
+            LEFT JOIN users c ON c.id = r.collected_by
             ORDER BY r.id DESC
         """)
         for row in rows:
@@ -728,6 +732,30 @@ def list_registrations():
     except Exception as e:
         log.error(f'list_registrations error: {e}')
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/registrations/<token>/collect-payment', methods=['POST'])
+@login_required
+def collect_pending_payment(token):
+    """Any logged-in volunteer can settle an online registration's deferred
+    ('pending') payment in person -- e.g. cash/UPI collected before the event."""
+    data = request.get_json() or {}
+    payment_mode = str(data.get('payment_mode', '')).strip().lower()
+    if payment_mode not in ('cash', 'upi'):
+        return jsonify({'error': "payment_mode must be 'cash' or 'upi'"}), 400
+
+    row = db_query("SELECT * FROM registrations WHERE token=%s", (token,), fetch='one')
+    if not row:
+        return jsonify({'error': 'Registration not found'}), 404
+    if row['payment_mode'] != 'pending':
+        return jsonify({'error': 'This registration is not awaiting payment'}), 400
+
+    paid = row['token_amount'] + row['aarti_amount'] + row['abhishek_amount'] + row['donation_amount']
+    db_execute(
+        "UPDATE registrations SET paid=%s, payment_mode=%s, collected_by=%s WHERE token=%s",
+        (paid, payment_mode, session['user_id'], token)
+    )
+    log.info(f'Pending payment collected: Token={token} Mode={payment_mode} Amount={paid} By={session.get("username")}')
+    return jsonify({'success': True, 'token': token, 'paid': paid, 'payment_mode': payment_mode})
 
 def _create_registration(data, registered_by, category):
     name       = str(data.get('name', '')).strip()
@@ -1175,16 +1203,18 @@ def export_csv():
                 r.category,
                 r.reg_at,
                 COALESCE(u.name, 'Unknown')   AS registered_by_user,
+                COALESCE(c.name, '')          AS collected_by_user,
                 IF(a.token IS NOT NULL,'Yes','No') AS attended,
                 COALESCE(a.persons, 0)             AS members_counted,
                 COALESCE(DATE_FORMAT(a.gate_time,'%%d/%%m/%%Y %%H:%%i'), '') AS gate_time
             FROM registrations r
             LEFT JOIN users u ON u.id = r.registered_by
+            LEFT JOIN users c ON c.id = r.collected_by
             LEFT JOIN attendance a ON r.token = a.token
             ORDER BY r.id ASC
         """)
 
-        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Payment Reference,Free Entry,Category,Registered At,Registered By Volunteer,Gate Attended,Gate Members Counted,Gate Entry Time']
+        lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Payment Reference,Free Entry,Category,Registered At,Registered By Volunteer,Payment Collected By,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
             addr   = str(r['address']).replace(',', ';').replace('\n', ' ')
             reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
@@ -1197,6 +1227,7 @@ def export_csv():
                 f"{'Yes' if r['free_entry'] else 'No'},"
                 f"{r['category']},"
                 f"{reg_at},{r['registered_by_user']},"
+                f"{r['collected_by_user']},"
                 f"{r['attended']},{r['members_counted']},{r['gate_time']}"
             )
 

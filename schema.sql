@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     free_entry       TINYINT(1)   NOT NULL DEFAULT 0, -- Free Entry flag (zeroes token_amount only)
     category         VARCHAR(10)  NOT NULL DEFAULT 'volunteer', -- 'volunteer' (staff-entered) or 'online' (public self-registration)
     registered_by    INT          NULL,               -- FK to users.id, NULL for online self-registrations
+    collected_by     INT          NULL,               -- FK to users.id -- volunteer who later collected a pending online payment
     reg_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_token (token),
     INDEX idx_mobile (mobile),

@@ -2233,6 +2233,24 @@
     }
 
     // ── REGISTRATIONS TABLE ──
+    function paidCellHtml(r) {
+      if (r.free_entry) return '<span class="badge badge-warning">FREE PASS</span>';
+      if (r.payment_mode === 'pending') {
+        return `<span class="badge badge-warning">Payment Pending</span>
+          <div style="display:flex; gap:0.3rem; margin-top:0.35rem;">
+            <button onclick="collectPayment('${r.token}','cash')" style="font-size:0.7rem; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid var(--accent-gold); background:rgba(245,158,11,0.15); color:var(--accent-gold-light); cursor:pointer; font-weight:600;">Collect Cash</button>
+            <button onclick="collectPayment('${r.token}','upi')" style="font-size:0.7rem; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid var(--accent-peacock); background:rgba(0,229,255,0.15); color:var(--accent-peacock); cursor:pointer; font-weight:600;">Collect UPI</button>
+          </div>`;
+      }
+      if (r.payment_mode === 'razorpay') {
+        return `<span class="badge badge-success" title="${r.payment_ref || ''}"><i class="fa-solid fa-circle-check"></i> ₹${r.paid} (Razorpay)</span>`;
+      }
+      if (r.collected_by_name) {
+        return `<span class="badge badge-success" title="Collected by ${r.collected_by_name}"><i class="fa-solid fa-circle-check"></i> ₹${r.paid} (${r.payment_mode.toUpperCase()})</span>`;
+      }
+      return '₹' + r.paid;
+    }
+
     async function loadRegistrations() {
       try {
         const res = await fetch(`${API_BASE}/api/registrations`, { credentials: 'include' });
@@ -2245,7 +2263,7 @@
             <td>${r.mobile}</td>
             <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.address}</td>
             <td>${r.persons}</td>
-            <td>${r.free_entry ? '<span class="badge badge-warning">FREE PASS</span>' : (r.payment_mode === 'pending' ? '<span class="badge badge-warning">Payment Pending</span>' : (r.payment_mode === 'razorpay' ? `<span class="badge badge-success" title="${r.payment_ref || ''}"><i class="fa-solid fa-circle-check"></i> ₹${r.paid} (Razorpay)</span>` : '₹' + r.paid))}</td>
+            <td>${paidCellHtml(r)}</td>
             <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>'}</td>
             <td>${r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System')}</td>
             <td>
@@ -2255,6 +2273,26 @@
         `).join('');
       } catch (err) {
         console.error('Registrations load error:', err);
+      }
+    }
+
+    async function collectPayment(token, mode) {
+      if (!confirm(`Confirm you collected the payment via ${mode.toUpperCase()} for token ${token}?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/registrations/${token}/collect-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ payment_mode: mode }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Could not record payment.');
+          return;
+        }
+        loadRegistrations();
+      } catch (err) {
+        alert('Could not reach the server.');
       }
     }
 
