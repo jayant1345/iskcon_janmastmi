@@ -25,6 +25,10 @@ razorpay_client = (
     razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
     if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET else None
 )
+# While the Razorpay website/domain is pending verification (24-48hrs), checkout on this
+# domain fails outright. Set ONLINE_PAYMENT_MODE=razorpay once that's approved to flip
+# the public registration flow back to pay-now; it falls back to pay-later until then.
+RAZORPAY_ENABLED = razorpay_client is not None and os.environ.get('ONLINE_PAYMENT_MODE', 'pending').strip().lower() == 'razorpay'
 
 # ── SECRET KEY & SESSION CONFIG ──
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -812,12 +816,19 @@ def register_family():
         return jsonify({'error': 'No payload submitted'}), 400
     return _create_registration(data, registered_by=session['user_id'], category='volunteer')
 
+@app.route('/api/register/public/config', methods=['GET'])
+def register_public_config():
+    """Public, no-login -- tells the /register page whether to run the Razorpay
+    pay-now flow or the pay-later fallback (e.g. while a new website/domain is
+    pending Razorpay's 24-48hr verification)."""
+    return jsonify({'razorpay_enabled': RAZORPAY_ENABLED})
+
 @app.route('/api/razorpay/order', methods=['POST'])
 def create_razorpay_order():
     """Public, no-login -- creates a Razorpay order for the token amount of an
     online self-registration, ahead of opening the Checkout popup."""
-    if not razorpay_client:
-        return jsonify({'error': 'Online payment is not configured yet'}), 503
+    if not RAZORPAY_ENABLED:
+        return jsonify({'error': 'Online payment is not available right now'}), 503
 
     data = request.get_json() or {}
     try:
@@ -852,15 +863,22 @@ def create_razorpay_order():
 @app.route('/api/register/public', methods=['POST'])
 def register_public():
     """Public, no-login self-registration -- reachable via the /register QR code.
-    Payment happens up front via Razorpay Checkout; the token is only created once
-    the payment signature is verified and the captured amount matches what's owed,
-    so registered_by stays NULL and category is always 'online'."""
-    if not razorpay_client:
-        return jsonify({'error': 'Online payment is not configured yet'}), 503
-
+    When RAZORPAY_ENABLED, payment happens up front via Razorpay Checkout and the
+    token is only created once the signature is verified and the captured amount
+    matches what's owed. Otherwise falls back to pay-later (payment_mode='pending').
+    Either way registered_by stays NULL and category is always 'online'."""
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No payload submitted'}), 400
+
+    if not RAZORPAY_ENABLED:
+        data = dict(data)
+        data['free_entry'] = False
+        data['payment_mode'] = 'pending'
+        data['aarti_amount'] = 0
+        data['abhishek_amount'] = 0
+        data['donation_amount'] = 0
+        return _create_registration(data, registered_by=None, category='online')
 
     order_id   = str(data.get('razorpay_order_id', '')).strip()
     payment_id = str(data.get('razorpay_payment_id', '')).strip()

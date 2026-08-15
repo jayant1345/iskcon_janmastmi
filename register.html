@@ -114,7 +114,7 @@
   </div>
 
   <div class="glass-card" id="form-card">
-    <div class="note-box">
+    <div class="note-box" id="payment-note">
       <i class="fa-solid fa-circle-info"></i>
       Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).
     </div>
@@ -158,7 +158,7 @@
     <div class="token-number" id="result-token">000</div>
     <div class="name" id="result-name"></div>
     <div class="meta" id="result-meta"></div>
-    <div class="note-box" style="margin-top: 1.25rem; text-align: left;">
+    <div class="note-box" id="success-note" style="margin-top: 1.25rem; text-align: left;">
       <i class="fa-solid fa-circle-info"></i>
       Payment received. Please save this token number and show it (or your registered mobile number) at the gate on the day of the event.
     </div>
@@ -194,27 +194,64 @@
       clearError();
     }
 
+    let razorpayEnabled = true; // updated from server config on load
+
     function resetSubmitBtn() {
       const btn = document.getElementById('submit-btn');
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register';
+      btn.innerHTML = razorpayEnabled
+        ? '<i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register'
+        : '<i class="fa-solid fa-ticket"></i> Register My Family';
     }
 
-    document.getElementById('public-register-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      clearError();
+    async function loadPaymentMode() {
+      try {
+        const res = await fetch('/api/register/public/config');
+        const data = await res.json();
+        razorpayEnabled = !!data.razorpay_enabled;
+      } catch (err) {
+        razorpayEnabled = false; // if we can't tell, don't block registration on payment
+      }
 
-      const payload = {
-        name: document.getElementById('reg-name').value.trim(),
-        mobile: document.getElementById('reg-mobile').value.trim(),
-        address: document.getElementById('reg-address').value.trim(),
-        persons: parseInt(document.getElementById('reg-persons').value, 10) || 1,
-      };
+      const note = document.getElementById('payment-note');
+      const successNote = document.getElementById('success-note');
+      if (razorpayEnabled) {
+        note.innerHTML = '<i class="fa-solid fa-circle-info"></i> Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).';
+        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this token number and show it (or your registered mobile number) at the gate on the day of the event.';
+      } else {
+        note.innerHTML = '<i class="fa-solid fa-circle-info"></i> This reserves your family\'s entry token now. Payment details will be shared with you soon — no payment is needed to complete this registration.';
+        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Please save this token number. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show this token (or your registered mobile number) at the gate on the day of the event.';
+      }
+      resetSubmitBtn();
+    }
+    loadPaymentMode();
 
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing payment...';
+    async function registerPending(payload, btn) {
+      try {
+        const res = await fetch('/api/register/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'Registration failed. Please try again.');
+          resetSubmitBtn();
+          return;
+        }
 
+        document.getElementById('result-token').textContent = data.token;
+        document.getElementById('result-name').textContent = data.name;
+        document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''}`;
+        document.getElementById('form-card').classList.add('hidden');
+        document.getElementById('success-card').classList.remove('hidden');
+      } catch (err) {
+        showError('Could not reach the server. Please check your connection and try again.');
+        resetSubmitBtn();
+      }
+    }
+
+    async function registerWithRazorpay(payload, btn) {
       let order;
       try {
         const orderRes = await fetch('/api/razorpay/order', {
@@ -285,6 +322,29 @@
         resetSubmitBtn();
       });
       rzp.open();
+    }
+
+    document.getElementById('public-register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+
+      const payload = {
+        name: document.getElementById('reg-name').value.trim(),
+        mobile: document.getElementById('reg-mobile').value.trim(),
+        address: document.getElementById('reg-address').value.trim(),
+        persons: parseInt(document.getElementById('reg-persons').value, 10) || 1,
+      };
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+
+      if (razorpayEnabled) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing payment...';
+        registerWithRazorpay(payload, btn);
+      } else {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registering...';
+        registerPending(payload, btn);
+      }
     });
   </script>
 </body>
