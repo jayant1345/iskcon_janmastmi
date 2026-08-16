@@ -1858,6 +1858,16 @@
     const EVENT_VENUE = 'Sant Shri Sadaram Bapa Community Hall, 3 Maruti, New CG Road, Nigam Nagar, Chandkheda';
     const EVENT_CONTACT = '9106572602';
 
+    const EVENT_SCHEDULE = [
+      { time: '3:00 – 4:00 PM', icon: '🪔', title: 'Darśana Ārati & Kīrtana', subtitle: 'Vraja-maṇḍala Darśana' },
+      { time: '4:00 – 5:45 PM', icon: '📖', title: 'Śrī Kṛṣṇa Kathā', subtitle: 'Gītā Śloka Recitation' },
+      { time: '5:45 – 7:30 PM', icon: '🎭', title: "Children's Cultural Event", subtitle: 'Śrī Viṣṇu Yajña • Sandhyā Ārti' },
+      { time: '7:30 – 8:40 PM', icon: '💃', title: 'Bharatanāṭyam on Kṛṣṇa-līlā', subtitle: 'Special Kṛṣṇa-līlā Drama' },
+      { time: '8:40 – 10:10 PM', icon: '🎤', title: 'Kṛṣṇa Kathā', subtitle: 'Felicitation & Acknowledgement of VIP Guest & Donors' },
+      { time: '10:10 PM – 12:00 Midnight', icon: '✨', title: 'GRAND JANMOTSAVA CELEBRATION', subtitle: 'Special Darśana • Mahā-Ārati • Abhiṣeka • Ecstatic Hare Kṛṣṇa Dhun' },
+      { time: '11:30 PM onwards', icon: '🍽️', title: 'MAHĀ-PRASĀDAM FOR ALL', subtitle: '' },
+    ];
+
     async function buildInvitationCanvas() {
       const data = currentTokenData;
       const qrCanvas = document.querySelector('#modal-qrcode canvas');
@@ -1887,7 +1897,8 @@
       measureCtx.font = '500 14px Inter, sans-serif';
       const venueLines = wrapCanvasText(measureCtx, EVENT_VENUE, bodyMaxWidth);
 
-      const rows = [
+      // ── PAGE 1: personal entry pass ──
+      const page1Rows = [
         { text: 'ISKCON CHANDKHEDA CENTER INVITES YOU', font: '700 13px Outfit, sans-serif', color: '#FBBF24', h: 24 },
         { type: 'devanagariTitle', text: 'श्री कृष्ण जन्माष्टमी', h: 62 },
         { text: '4 September 2026 · Friday', font: '700 17px Outfit, sans-serif', color: '#FFFFFF', h: 26 },
@@ -1905,9 +1916,42 @@
         { text: `📞 ${EVENT_CONTACT}`, font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
       ];
 
+      // ── PAGE 2: event schedule ──
+      const scheduleBoxW = 176;
+      const scheduleTextX = pad + scheduleBoxW + 16;
+      const scheduleTextMaxWidth = W - scheduleTextX - pad;
+      measureCtx.font = '700 15px Outfit, sans-serif';
+      const scheduleItems = EVENT_SCHEDULE.map(item => {
+        const titleLines = wrapCanvasText(measureCtx, item.title, scheduleTextMaxWidth);
+        measureCtx.font = '500 13px Inter, sans-serif';
+        const subtitleLines = item.subtitle ? wrapCanvasText(measureCtx, item.subtitle, scheduleTextMaxWidth) : [];
+        measureCtx.font = '700 15px Outfit, sans-serif';
+        const textLineH = 19, subLineH = 17;
+        const textBlockH = titleLines.length * textLineH + subtitleLines.length * subLineH;
+        const h = Math.max(60, textBlockH + 14);
+        return { ...item, titleLines, subtitleLines, textLineH, subLineH, h };
+      });
+      measureCtx.font = '500 15px Inter, sans-serif';
+      const closingLines = wrapCanvasText(
+        measureCtx,
+        'Come with your family & friends and immerse yourself in the divine celebration of the Appearance of Lord Śrī Kṛṣṇa.',
+        bodyMaxWidth
+      );
+
+      const page2Rows = [
+        { type: 'pageDivider', h: 34 },
+        { text: 'EVENT SCHEDULE', font: '800 22px Outfit, sans-serif', color: '#FBBF24', h: 34 },
+        ...scheduleItems.map(item => ({ type: 'scheduleItem', item, h: item.h + 10 })),
+        { type: 'multiline', lines: closingLines, font: 'italic 500 14px Inter, sans-serif', color: '#E2E8F0', lineH: 20, h: closingLines.length * 20 + 10 },
+        { text: 'Organized By: ISKCON Chandkheda Center', font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
+        { type: 'multiline', lines: venueLines, font: '500 14px Inter, sans-serif', color: '#94A3B8', lineH: 19, h: venueLines.length * 19 },
+        { text: `📞 ${EVENT_CONTACT}`, font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
+      ];
+
       const topPad = 22, bottomPad = 28, rowGap = 6;
       let bodyH = topPad + bottomPad;
-      rows.forEach(r => { bodyH += r.h + rowGap; });
+      page1Rows.forEach(r => { bodyH += r.h + rowGap; });
+      page2Rows.forEach(r => { bodyH += r.h + rowGap; });
       const totalH = artH + bodyH;
 
       const canvas = document.createElement('canvas');
@@ -1940,8 +1984,13 @@
         ctx.drawImage(logoImg, W - logoW - 16, 12, logoW, logoH);
       }
 
-      // ── Solid panel below ──
-      ctx.fillStyle = '#0B1330';
+      // ── Solid panel below (morpankh / peacock-feather teal-to-indigo, not flat near-black
+      // navy -- that read as solid black on a lot of phone screens) ──
+      const panelGrad = ctx.createLinearGradient(0, artH, 0, totalH);
+      panelGrad.addColorStop(0, '#0F3D46');
+      panelGrad.addColorStop(0.55, '#123457');
+      panelGrad.addColorStop(1, '#161B45');
+      ctx.fillStyle = panelGrad;
       ctx.fillRect(0, artH, W, bodyH);
       ctx.strokeStyle = '#F59E0B';
       ctx.lineWidth = 2;
@@ -1954,8 +2003,7 @@
       ctx.shadowColor = 'rgba(0,0,0,0.6)';
       ctx.shadowBlur = 4;
 
-      let y = artH + topPad;
-      rows.forEach(r => {
+      function drawRow(r, y) {
         if (r.type === 'devanagariTitle') {
           ctx.fillStyle = '#FBBF24';
           ctx.font = "800 40px 'Yatra One', 'Noto Sans Devanagari', sans-serif";
@@ -1991,6 +2039,60 @@
           ctx.fill();
           ctx.drawImage(qrCanvas, qrX, y + 10, qrSize, qrSize);
           ctx.shadowBlur = 4;
+        } else if (r.type === 'pageDivider') {
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(pad, y + r.h / 2);
+          ctx.lineTo(W - pad, y + r.h / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font = '700 11px Outfit, sans-serif';
+          ctx.fillStyle = '#0F3D46';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const label = '✁ PAGE 2';
+          const lw = ctx.measureText(label).width + 20;
+          ctx.fillStyle = '#123457';
+          roundRectPath(ctx, W / 2 - lw / 2, y + r.h / 2 - 10, lw, 20, 10);
+          ctx.fill();
+          ctx.fillStyle = '#FBBF24';
+          ctx.fillText(label, W / 2, y + r.h / 2 + 1);
+          ctx.shadowBlur = 4;
+        } else if (r.type === 'scheduleItem') {
+          const item = r.item;
+          const boxH = Math.min(r.h - 10, 78);
+          const boxY = y + (r.h - boxH) / 2;
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
+          ctx.lineWidth = 1.5;
+          roundRectPath(ctx, pad, boxY, scheduleBoxW, boxH, 8);
+          ctx.stroke();
+          ctx.fillStyle = '#FBBF24';
+          ctx.font = '700 13px Outfit, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const timeLines = wrapCanvasText(ctx, item.time, scheduleBoxW - 14);
+          const timeLineH = 15;
+          const timeStartY = boxY + boxH / 2 - ((timeLines.length - 1) * timeLineH) / 2;
+          timeLines.forEach((line, i) => ctx.fillText(line, pad + scheduleBoxW / 2, timeStartY + i * timeLineH));
+
+          const textBlockH = item.titleLines.length * item.textLineH + item.subtitleLines.length * item.subLineH;
+          let ty = y + (r.h - textBlockH) / 2 + item.textLineH / 2;
+          ctx.textAlign = 'left';
+          ctx.font = '20px "Segoe UI Emoji", sans-serif';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillText(item.icon, scheduleTextX, ty - 2);
+          const textX = scheduleTextX + 30;
+          ctx.font = '700 15px Outfit, sans-serif';
+          ctx.fillStyle = '#FFFFFF';
+          item.titleLines.forEach(line => { ctx.fillText(line, textX, ty); ty += item.textLineH; });
+          ctx.font = '500 13px Inter, sans-serif';
+          ctx.fillStyle = '#94A3B8';
+          item.subtitleLines.forEach(line => { ctx.fillText(line, textX, ty); ty += item.subLineH; });
+          ctx.shadowBlur = 4;
         } else {
           ctx.fillStyle = r.color;
           ctx.font = r.font;
@@ -1998,6 +2100,11 @@
           ctx.textBaseline = 'middle';
           ctx.fillText(r.text, W / 2, y + r.h / 2);
         }
+      }
+
+      let y = artH + topPad;
+      [...page1Rows, ...page2Rows].forEach(r => {
+        drawRow(r, y);
         y += r.h + rowGap;
       });
 
