@@ -1925,7 +1925,10 @@
         ctx.beginPath();
         ctx.rect(0, 0, W, artH);
         ctx.clip();
-        ctx.drawImage(bgImg, (W - imgW) / 2, (artH - imgH) / 2, imgW, imgH);
+        // The artwork's focal point (face, baby Krishna, cobra hood) sits in the upper
+        // portion of the source image, so bias the crop toward the top instead of
+        // centering it -- centering was cutting too much off the hood/head.
+        ctx.drawImage(bgImg, (W - imgW) / 2, (artH - imgH) * 0.12, imgW, imgH);
         ctx.restore();
       } else {
         ctx.fillStyle = '#0B1330';
