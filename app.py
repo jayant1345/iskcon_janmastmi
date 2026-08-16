@@ -1237,6 +1237,7 @@ def export_csv():
             headers={'Content-Disposition': 'attachment; filename=iskcon_janmastmi_report_2026.csv'}
         )
     except Exception as e:
+        log.error(f'export_csv error: {e}')
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
