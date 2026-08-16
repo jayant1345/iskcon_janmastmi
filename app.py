@@ -25,10 +25,16 @@ razorpay_client = (
     razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
     if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET else None
 )
-# While the Razorpay website/domain is pending verification (24-48hrs), checkout on this
-# domain fails outright. Set ONLINE_PAYMENT_MODE=razorpay once that's approved to flip
-# the public registration flow back to pay-now; it falls back to pay-later until then.
-RAZORPAY_ENABLED = razorpay_client is not None and os.environ.get('ONLINE_PAYMENT_MODE', 'pending').strip().lower() == 'razorpay'
+# ONLINE_PAYMENT_MODE controls how the public /register flow collects payment:
+#   'pending'      -- pay later (instant token, settle in person) -- the safe default
+#   'razorpay'     -- embedded Checkout.js on this domain -- needs the website approved
+#                      in Razorpay's dashboard (Checkout enforces a domain allowlist)
+#   'payment_link' -- redirect to a Razorpay-hosted Payment Link page instead; since the
+#                      payment page itself isn't embedded on this domain, it isn't subject
+#                      to that same website-approval check, so it can work immediately
+ONLINE_PAYMENT_MODE = os.environ.get('ONLINE_PAYMENT_MODE', 'pending').strip().lower()
+RAZORPAY_ENABLED = razorpay_client is not None and ONLINE_PAYMENT_MODE == 'razorpay'
+PAYMENT_LINK_ENABLED = razorpay_client is not None and ONLINE_PAYMENT_MODE == 'payment_link'
 
 # ── SECRET KEY & SESSION CONFIG ──
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -892,10 +898,13 @@ def register_family():
 
 @app.route('/api/register/public/config', methods=['GET'])
 def register_public_config():
-    """Public, no-login -- tells the /register page whether to run the Razorpay
-    pay-now flow or the pay-later fallback (e.g. while a new website/domain is
-    pending Razorpay's 24-48hr verification)."""
-    return jsonify({'razorpay_enabled': RAZORPAY_ENABLED})
+    """Public, no-login -- tells the /register page which payment flow to run:
+    embedded Checkout ('razorpay'), a redirect to a Razorpay Payment Link
+    ('payment_link' -- works even while the Checkout domain approval is pending,
+    since the payment page itself is hosted on Razorpay, not this domain), or
+    the pay-later fallback ('pending')."""
+    mode = 'razorpay' if RAZORPAY_ENABLED else ('payment_link' if PAYMENT_LINK_ENABLED else 'pending')
+    return jsonify({'mode': mode, 'razorpay_enabled': RAZORPAY_ENABLED})
 
 @app.route('/api/razorpay/order', methods=['POST'])
 def create_razorpay_order():
@@ -933,6 +942,138 @@ def create_razorpay_order():
     except Exception as e:
         log.error(f'razorpay order create error: {e}')
         return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
+@app.route('/api/razorpay/payment-link', methods=['POST'])
+def create_razorpay_payment_link():
+    """Public, no-login -- creates a Razorpay Payment Link for this registration and
+    returns its hosted URL to redirect the browser to. Unlike embedded Checkout, this
+    page is hosted on Razorpay's own domain, so it isn't blocked by the website/domain
+    approval that gates the Checkout.js flow on this site."""
+    if not PAYMENT_LINK_ENABLED:
+        return jsonify({'error': 'Online payment is not available right now'}), 503
+
+    data = request.get_json() or {}
+    name = str(data.get('name', '')).strip()
+    mobile = str(data.get('mobile', '')).strip()
+    address = str(data.get('address', '')).strip()
+    try:
+        persons = int(data.get('persons', 1))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid members count'}), 400
+
+    if not name or not address or not mobile:
+        return jsonify({'error': 'Name, address, and mobile number are required'}), 400
+    if not re.match(r'^\d{10}$', mobile):
+        return jsonify({'error': 'Mobile number must be 10 digits'}), 400
+    if persons < 1 or persons > 50:
+        return jsonify({'error': 'Members count must be between 1 and 50'}), 400
+
+    rate = get_settings_row()['token_rate']
+    amount_paise = persons * rate * 100
+    if amount_paise <= 0:
+        return jsonify({'error': 'Nothing to pay'}), 400
+
+    reference_id = secrets.token_hex(12)
+    callback_url = request.host_url.rstrip('/') + '/register'
+
+    try:
+        link = razorpay_client.payment_link.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'accept_partial': False,
+            'description': f'ISKCON Janmashtami 2026 Entry Token ({persons} member{"s" if persons > 1 else ""})',
+            'customer': {'name': name[:100], 'contact': mobile},
+            'notify': {'sms': False, 'email': False},
+            'reminder_enable': False,
+            'reference_id': reference_id,
+            'callback_url': callback_url,
+            'callback_method': 'get',
+            'notes': {
+                'event': 'ISKCON Janmashtami 2026 Online Registration',
+                'name': name[:255],
+                'mobile': mobile[:15],
+                'address': address[:500],
+                'persons': persons,
+            },
+        })
+        return jsonify({'short_url': link['short_url'], 'id': link['id']})
+    except Exception as e:
+        log.error(f'razorpay payment_link create error: {e}')
+        return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
+@app.route('/api/register/public/payment-link-complete', methods=['POST'])
+def register_public_payment_link_complete():
+    """Public, no-login -- called by /register after Razorpay redirects back from a
+    Payment Link. Verifies the redirect's signature server-side (so it can't be forged),
+    confirms the link is actually paid, then creates the registration from the details
+    stashed in the link's notes at creation time. Idempotent on razorpay_payment_id, since
+    a page refresh/back-navigation on the callback page would otherwise replay this.
+    Deliberately not gated on PAYMENT_LINK_ENABLED -- a link created while that mode was
+    on must still be honored even if the mode is switched before the payer returns."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not configured'}), 503
+
+    data = request.get_json() or {}
+    payment_id = str(data.get('razorpay_payment_id', '')).strip()
+    link_id = str(data.get('razorpay_payment_link_id', '')).strip()
+    link_ref = str(data.get('razorpay_payment_link_reference_id', '')).strip()
+    link_status = str(data.get('razorpay_payment_link_status', '')).strip()
+    signature = str(data.get('razorpay_signature', '')).strip()
+    if not (payment_id and link_id and link_status and signature):
+        return jsonify({'error': 'Payment verification data missing'}), 400
+
+    try:
+        valid = razorpay_client.utility.verify_payment_link_signature({
+            'razorpay_payment_id': payment_id,
+            'payment_link_id': link_id,
+            'payment_link_reference_id': link_ref,
+            'payment_link_status': link_status,
+            'razorpay_signature': signature,
+        })
+        if not valid:
+            raise razorpay.errors.SignatureVerificationError('signature mismatch')
+    except razorpay.errors.SignatureVerificationError:
+        log.error(f'Razorpay payment-link signature verification failed for link {link_id}')
+        return jsonify({'error': 'Payment verification failed'}), 400
+
+    if link_status != 'paid':
+        return jsonify({'error': f'Payment was not completed (status: {link_status}).'}), 400
+
+    existing = db_query("SELECT * FROM registrations WHERE payment_ref=%s", (payment_id,), fetch='one')
+    if existing:
+        return jsonify({
+            'success': True, 'token': existing['token'], 'name': existing['name'],
+            'persons': existing['persons'], 'paid': existing['paid'],
+            'token_amount': existing['token_amount'], 'aarti_amount': existing['aarti_amount'],
+            'abhishek_amount': existing['abhishek_amount'], 'donation_amount': existing['donation_amount'],
+            'free_entry': bool(existing['free_entry']), 'payment_mode': existing['payment_mode'],
+            'category': existing['category'],
+        }), 200
+
+    try:
+        link = razorpay_client.payment_link.fetch(link_id)
+    except Exception as e:
+        log.error(f'razorpay payment_link fetch error: {e}')
+        return jsonify({'error': 'Could not verify payment. Please contact support with your payment ID.'}), 500
+
+    if link.get('status') != 'paid' or link.get('amount_paid') != link.get('amount'):
+        log.error(f'Razorpay payment-link status/amount mismatch: {link}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
+    notes = link.get('notes') or {}
+    reg_data = {
+        'name': notes.get('name', ''),
+        'mobile': notes.get('mobile', ''),
+        'address': notes.get('address', ''),
+        'persons': notes.get('persons', 1),
+        'free_entry': False,
+        'payment_mode': 'razorpay',
+        'payment_ref': payment_id,
+        'aarti_amount': 0,
+        'abhishek_amount': 0,
+        'donation_amount': 0,
+    }
+    return _create_registration(reg_data, registered_by=None, category='online')
 
 @app.route('/api/register/public', methods=['POST'])
 def register_public():

@@ -221,33 +221,33 @@
       clearError();
     }
 
-    let razorpayEnabled = true; // updated from server config on load
+    let paymentMode = 'pending'; // 'pending' | 'razorpay' | 'payment_link' -- updated from server config on load
 
     function resetSubmitBtn() {
       const btn = document.getElementById('submit-btn');
       btn.disabled = false;
-      btn.innerHTML = razorpayEnabled
-        ? '<i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register'
-        : '<i class="fa-solid fa-ticket"></i> Register My Family';
+      btn.innerHTML = paymentMode === 'pending'
+        ? '<i class="fa-solid fa-ticket"></i> Register My Family'
+        : '<i class="fa-solid fa-lock"></i> Proceed to Pay &amp; Register';
     }
 
     async function loadPaymentMode() {
       try {
         const res = await fetch('/api/register/public/config');
         const data = await res.json();
-        razorpayEnabled = !!data.razorpay_enabled;
+        paymentMode = data.mode || 'pending';
       } catch (err) {
-        razorpayEnabled = false; // if we can't tell, don't block registration on payment
+        paymentMode = 'pending'; // if we can't tell, don't block registration on payment
       }
 
       const note = document.getElementById('payment-note');
       const successNote = document.getElementById('success-note');
-      if (razorpayEnabled) {
-        note.innerHTML = '<i class="fa-solid fa-circle-info"></i> Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).';
-        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this pass and show its QR code (or your registered mobile number) at the gate on the day of the event.';
-      } else {
+      if (paymentMode === 'pending') {
         note.innerHTML = '<i class="fa-solid fa-circle-info"></i> This reserves your family\'s entry token now. Payment details will be shared with you soon — no payment is needed to complete this registration.';
         successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Please save this pass. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show its QR code (or your registered mobile number) at the gate on the day of the event.';
+      } else {
+        note.innerHTML = '<i class="fa-solid fa-circle-info"></i> Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).';
+        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this pass and show its QR code (or your registered mobile number) at the gate on the day of the event.';
       }
       resetSubmitBtn();
     }
@@ -630,6 +630,73 @@
       rzp.open();
     }
 
+    async function registerWithPaymentLink(payload, btn) {
+      try {
+        const res = await fetch('/api/razorpay/payment-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const link = await res.json();
+        if (!res.ok) {
+          showError(link.error || 'Could not start payment. Please try again.');
+          resetSubmitBtn();
+          return;
+        }
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Redirecting to payment...';
+        window.location.href = link.short_url;
+      } catch (err) {
+        showError('Could not reach the server. Please check your connection and try again.');
+        resetSubmitBtn();
+      }
+    }
+
+    // ── Handle returning from a Razorpay Payment Link redirect ──
+    async function handlePaymentLinkReturn() {
+      const params = new URLSearchParams(window.location.search);
+      const paymentId = params.get('razorpay_payment_id');
+      const linkId = params.get('razorpay_payment_link_id');
+      if (!paymentId || !linkId) return false;
+
+      // Strip the params immediately so a later refresh doesn't try to reprocess this URL
+      // (the backend is idempotent on payment_id too, as a second line of defense).
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      document.getElementById('form-card').classList.add('hidden');
+      const status = params.get('razorpay_payment_link_status');
+      if (status !== 'paid') {
+        showError(`Payment was not completed (status: ${status || 'unknown'}). Please try registering again.`);
+        document.getElementById('form-card').classList.remove('hidden');
+        return true;
+      }
+
+      try {
+        const res = await fetch('/api/register/public/payment-link-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_payment_id: paymentId,
+            razorpay_payment_link_id: linkId,
+            razorpay_payment_link_reference_id: params.get('razorpay_payment_link_reference_id'),
+            razorpay_payment_link_status: status,
+            razorpay_signature: params.get('razorpay_signature'),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError((data.error || 'Registration failed after payment.') + ' Your payment ID: ' + paymentId + ' — please save this and contact us.');
+          document.getElementById('form-card').classList.remove('hidden');
+          return true;
+        }
+        showInvitationPass(data);
+      } catch (err) {
+        showError('Payment succeeded but we could not reach the server to confirm your token. Your payment ID: ' + paymentId + ' — please save this and contact us.');
+        document.getElementById('form-card').classList.remove('hidden');
+      }
+      return true;
+    }
+    handlePaymentLinkReturn();
+
     document.getElementById('public-register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       clearError();
@@ -644,9 +711,12 @@
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
 
-      if (razorpayEnabled) {
+      if (paymentMode === 'razorpay') {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing payment...';
         registerWithRazorpay(payload, btn);
+      } else if (paymentMode === 'payment_link') {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing payment...';
+        registerWithPaymentLink(payload, btn);
       } else {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registering...';
         registerPending(payload, btn);
