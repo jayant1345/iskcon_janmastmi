@@ -873,6 +873,8 @@ def _create_registration(data, registered_by, category):
             'success':         True,
             'token':           token,
             'name':            name,
+            'mobile':          mobile,
+            'address':         address,
             'persons':         persons,
             'paid':            paid,
             'token_amount':    token_amount,
@@ -1043,6 +1045,7 @@ def register_public_payment_link_complete():
     if existing:
         return jsonify({
             'success': True, 'token': existing['token'], 'name': existing['name'],
+            'mobile': existing['mobile'], 'address': existing['address'],
             'persons': existing['persons'], 'paid': existing['paid'],
             'token_amount': existing['token_amount'], 'aarti_amount': existing['aarti_amount'],
             'abhishek_amount': existing['abhishek_amount'], 'donation_amount': existing['donation_amount'],
