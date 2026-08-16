@@ -9,8 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Yatra+One&family=Noto+Sans+Devanagari:wght@600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- checkout.js (Razorpay's embedded-Checkout UI bundle, 150+ background requests) is
+       loaded lazily below, only when payment_link mode isn't in use -- unconditionally
+       including it here was silently flooding the connection during the payment_link
+       redirect flow, competing for bandwidth with the request that actually matters. -->
 
   <style>
     :root {
@@ -222,6 +225,22 @@
     }
 
     let paymentMode = 'pending'; // 'pending' | 'razorpay' | 'payment_link' -- updated from server config on load
+    let razorpayCheckoutScriptPromise = null;
+
+    // Only load Razorpay's ~150-request Checkout UI bundle when embedded Checkout is
+    // actually the active mode -- loading it unconditionally starved the payment_link
+    // flow's actual redirect request for bandwidth on slow mobile connections.
+    function loadRazorpayCheckoutScript() {
+      if (razorpayCheckoutScriptPromise) return razorpayCheckoutScriptPromise;
+      razorpayCheckoutScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+      return razorpayCheckoutScriptPromise;
+    }
 
     function resetSubmitBtn() {
       const btn = document.getElementById('submit-btn');
@@ -250,6 +269,10 @@
         successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this pass and show its QR code (or your registered mobile number) at the gate on the day of the event.';
       }
       resetSubmitBtn();
+
+      if (paymentMode === 'razorpay') {
+        loadRazorpayCheckoutScript().catch(() => {}); // pre-warm in the background; registerWithRazorpay awaits it too as a safety net
+      }
     }
     loadPaymentMode();
 
@@ -670,6 +693,14 @@
     }
 
     async function registerWithRazorpay(payload, btn) {
+      try {
+        await loadRazorpayCheckoutScript();
+      } catch (err) {
+        showError('Could not load the payment provider. Please check your connection and try again.');
+        resetSubmitBtn();
+        return;
+      }
+
       let order;
       try {
         const orderRes = await fetch('/api/razorpay/order', {
