@@ -1876,6 +1876,7 @@
       const W = 640;
       const pad = 36;
       const qrSize = 220;
+      const artH = 300; // top art band, matches the physical card's photo-banner-then-solid-panel layout
       const bodyMaxWidth = W - pad * 2 - 20;
       const addrLineH = 20;
 
@@ -1887,7 +1888,6 @@
       const venueLines = wrapCanvasText(measureCtx, EVENT_VENUE, bodyMaxWidth);
 
       const rows = [
-        { type: 'logo', h: logoImg ? 52 : 0 },
         { text: 'ISKCON CHANDKHEDA CENTER INVITES YOU', font: '700 13px Outfit, sans-serif', color: '#FBBF24', h: 24 },
         { type: 'devanagariTitle', text: 'श्री कृष्ण जन्माष्टमी', h: 62 },
         { text: '4 September 2026 · Friday', font: '700 17px Outfit, sans-serif', color: '#FFFFFF', h: 26 },
@@ -1905,9 +1905,10 @@
         { text: `📞 ${EVENT_CONTACT}`, font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
       ];
 
-      const topPad = 28, bottomPad = 30, rowGap = 6;
-      let totalH = topPad + bottomPad;
-      rows.forEach(r => { totalH += r.h + rowGap; });
+      const topPad = 22, bottomPad = 28, rowGap = 6;
+      let bodyH = topPad + bottomPad;
+      rows.forEach(r => { bodyH += r.h + rowGap; });
+      const totalH = artH + bodyH;
 
       const canvas = document.createElement('canvas');
       canvas.width = W * scale;
@@ -1915,34 +1916,44 @@
       const ctx = canvas.getContext('2d');
       ctx.scale(scale, scale);
 
+      // ── Art band (full-bleed, no dark overlay) ──
       if (bgImg) {
-        const coverScale = Math.max(W / bgImg.width, totalH / bgImg.height);
+        const coverScale = Math.max(W / bgImg.width, artH / bgImg.height);
         const imgW = bgImg.width * coverScale;
         const imgH = bgImg.height * coverScale;
-        ctx.drawImage(bgImg, (W - imgW) / 2, (totalH - imgH) / 2, imgW, imgH);
-        ctx.fillStyle = 'rgba(6, 12, 28, 0.62)';
-        ctx.fillRect(0, 0, W, totalH);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W, artH);
+        ctx.clip();
+        ctx.drawImage(bgImg, (W - imgW) / 2, (artH - imgH) / 2, imgW, imgH);
+        ctx.restore();
       } else {
-        ctx.fillStyle = '#050B1A';
-        ctx.fillRect(0, 0, W, totalH);
+        ctx.fillStyle = '#0B1330';
+        ctx.fillRect(0, 0, W, artH);
       }
+      // logo, top-right over the art band, like the physical card
+      if (logoImg) {
+        const logoH = 42, logoW = (logoImg.width / logoImg.height) * logoH;
+        ctx.drawImage(logoImg, W - logoW - 16, 12, logoW, logoH);
+      }
+
+      // ── Solid panel below ──
+      ctx.fillStyle = '#0B1330';
+      ctx.fillRect(0, artH, W, bodyH);
       ctx.strokeStyle = '#F59E0B';
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, artH);
+      ctx.lineTo(W, artH);
+      ctx.stroke();
       ctx.strokeRect(1, 1, W - 2, totalH - 2);
 
-      ctx.shadowColor = 'rgba(0,0,0,0.85)';
-      ctx.shadowBlur = 6;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 4;
 
-      let y = topPad;
+      let y = artH + topPad;
       rows.forEach(r => {
-        if (r.type === 'logo') {
-          if (logoImg) {
-            ctx.shadowBlur = 0;
-            const logoH = r.h, logoW = (logoImg.width / logoImg.height) * logoH;
-            ctx.drawImage(logoImg, (W - logoW) / 2, y, logoW, logoH);
-            ctx.shadowBlur = 6;
-          }
-        } else if (r.type === 'devanagariTitle') {
+        if (r.type === 'devanagariTitle') {
           ctx.fillStyle = '#FBBF24';
           ctx.font = "800 40px 'Yatra One', 'Noto Sans Devanagari', sans-serif";
           ctx.textAlign = 'center';
@@ -1960,7 +1971,7 @@
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(r.text, W / 2, y + r.h / 2 + 2);
-          ctx.shadowBlur = 6;
+          ctx.shadowBlur = 4;
         } else if (r.type === 'multiline') {
           ctx.fillStyle = r.color;
           ctx.font = r.font;
@@ -1976,7 +1987,7 @@
           roundRectPath(ctx, qrX - 10, y, qrSize + 20, qrSize + 20, 12);
           ctx.fill();
           ctx.drawImage(qrCanvas, qrX, y + 10, qrSize, qrSize);
-          ctx.shadowBlur = 6;
+          ctx.shadowBlur = 4;
         } else {
           ctx.fillStyle = r.color;
           ctx.font = r.font;
