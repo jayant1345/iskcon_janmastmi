@@ -261,12 +261,19 @@ def init_db():
             except Exception as me:
                 log.error(f'Timezone backfill error: {me}')
 
-            # ── Seed default admin user ──
+            # ── Seed/sync default admin user ──
+            # ON DUPLICATE KEY UPDATE keeps the admin password in sync with the
+            # ADMIN_PASSWORD env var on every restart, so changing it on Railway
+            # and redeploying is enough to change the login (no manual DB access
+            # needed). Note: this means an admin password changed later via the
+            # Users UI reverts to ADMIN_PASSWORD on the next restart/deploy unless
+            # the env var is also updated to match.
             admin_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
             admin_mob = os.environ.get('ADMIN_MOBILE', '0000000000')
             cur.execute("""
-                INSERT IGNORE INTO users (username, password_hash, name, mobile, role)
+                INSERT INTO users (username, password_hash, name, mobile, role)
                 VALUES (%s, %s, %s, %s, 'admin')
+                ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)
             """, ('admin', generate_password_hash(admin_pw), 'Administrator', admin_mob))
 
             conn.commit()
