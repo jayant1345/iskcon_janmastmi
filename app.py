@@ -790,6 +790,19 @@ def collect_pending_payment(token):
     log.info(f'Pending payment collected: Token={token} Mode={payment_mode} Amount={paid} By={session.get("username")}')
     return jsonify({'success': True, 'token': token, 'paid': paid, 'payment_mode': payment_mode})
 
+@app.route('/api/registrations/<token>', methods=['DELETE'])
+@admin_required
+def delete_registration(token):
+    """Admin-only: remove a single mistaken registration (e.g. duplicate/test entry)
+    without wiping the whole event's data via the Danger Zone reset."""
+    row = db_query("SELECT name FROM registrations WHERE token=%s", (token,), fetch='one')
+    if not row:
+        return jsonify({'error': 'Registration not found'}), 404
+    db_execute("DELETE FROM attendance WHERE token=%s", (token,))
+    db_execute("DELETE FROM registrations WHERE token=%s", (token,))
+    log.warning(f'Registration deleted: Token={token} Name={row["name"]} By={session.get("username")}')
+    return jsonify({'success': True, 'token': token})
+
 def _create_registration(data, registered_by, category):
     name       = str(data.get('name', '')).strip()
     address    = str(data.get('address', '')).strip()

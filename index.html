@@ -1034,6 +1034,7 @@
                   <th>Category</th>
                   <th>Registered By</th>
                   <th>Status</th>
+                  <th id="reg-actions-header" class="hidden">Actions</th>
                 </tr>
               </thead>
               <tbody id="registrations-table-body">
@@ -1390,12 +1391,14 @@
         document.getElementById('leaderboard-section').classList.remove('hidden');
         document.getElementById('settlement-history-section').classList.remove('hidden');
         document.getElementById('stat-mybalance-card').classList.add('hidden');
+        document.getElementById('reg-actions-header').classList.remove('hidden');
       } else {
         document.getElementById('nav-users-tab').classList.add('hidden');
         document.getElementById('stat-collection-card').classList.add('hidden');
         document.getElementById('leaderboard-section').classList.add('hidden');
         document.getElementById('settlement-history-section').classList.add('hidden');
         document.getElementById('stat-mybalance-card').classList.remove('hidden');
+        document.getElementById('reg-actions-header').classList.add('hidden');
       }
 
       switchTab('dashboard');
@@ -2300,10 +2303,31 @@
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
             </td>
+            ${currentUser && currentUser.role === 'admin' ? `
+            <td>
+              <button onclick="deleteRegistration('${r.token}', '${String(r.name || '').replace(/'/g, "\\'")}')" style="font-size:0.7rem; padding:0.3rem 0.6rem; border-radius:6px; border:1px solid var(--danger); background:rgba(239,68,68,0.12); color:#FCA5A5; cursor:pointer; font-weight:600; white-space:nowrap;">
+                <i class="fa-solid fa-trash-can"></i> Delete
+              </button>
+            </td>` : ''}
           </tr>
         `).join('');
       } catch (err) {
         console.error('Registrations load error:', err);
+      }
+    }
+
+    async function deleteRegistration(token, name) {
+      if (!confirm(`Delete registration for "${name}" (Token ${token})? This permanently removes the registration and its gate-entry record, if any. This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/registrations/${token}`, { method: 'DELETE', credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Could not delete this registration.');
+          return;
+        }
+        loadRegistrations();
+      } catch (err) {
+        alert('Could not reach the server.');
       }
     }
 
