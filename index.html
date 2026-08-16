@@ -8,7 +8,7 @@
   <!-- Google Fonts: Outfit & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Yatra+One&family=Noto+Sans+Devanagari:wght@600;800&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1194,8 +1194,8 @@
   <div id="token-modal" class="modal-overlay">
     <div class="token-card">
       <div id="invitation-capture-area" style="background: var(--bg-card, #0B132B); padding: 0.5rem;">
-        <h4 style="color: var(--accent-peacock); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Janmashtami 2026</h4>
-        <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">DEVOTEE ENTRY PASS</h2>
+        <h4 style="color: var(--accent-gold-light); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;">ISKCON Chandkheda Center Invites You</h4>
+        <h2 style="color: white; font-size: 1.25rem; font-weight: 700;">Śrī Kṛṣṇa Janmāṣṭamī — 4 Sept 2026</h2>
 
         <div class="token-number" id="modal-token-num">001</div>
         <h3 id="modal-name" style="color: white; font-size: 1.2rem;">Devotee Name</h3>
@@ -1855,6 +1855,9 @@
     // text + the QR canvas's own pixels drawn in directly) instead of via html2canvas --
     // html2canvas silently renders the QR canvas as a blank white square for this QR
     // library, so a DOM screenshot approach loses the QR code entirely.
+    const EVENT_VENUE = 'Sant Shri Sadaram Bapa Community Hall, 3 Maruti, New CG Road, Nigam Nagar, Chandkheda';
+    const EVENT_CONTACT = '9106572602';
+
     async function buildInvitationCanvas() {
       const data = currentTokenData;
       const qrCanvas = document.querySelector('#modal-qrcode canvas');
@@ -1865,14 +1868,14 @@
       }
 
       const [bgImg, logoImg] = await Promise.all([
-        loadImage('dancing_peacock_ladoo_gopal.jpg').catch(() => null),
+        loadImage('janmashtami_pass_bg.jpg').catch(() => null),
         loadImage('iskcon_logo_icon.png').catch(() => null),
       ]);
 
       const scale = 2;
       const W = 640;
       const pad = 36;
-      const qrSize = 240;
+      const qrSize = 220;
       const bodyMaxWidth = W - pad * 2 - 20;
       const addrLineH = 20;
 
@@ -1880,23 +1883,29 @@
       const measureCtx = document.createElement('canvas').getContext('2d');
       measureCtx.font = '500 15px Inter, sans-serif';
       const addressLines = data.address ? wrapCanvasText(measureCtx, `Address: ${data.address}`, bodyMaxWidth) : [];
+      measureCtx.font = '500 14px Inter, sans-serif';
+      const venueLines = wrapCanvasText(measureCtx, EVENT_VENUE, bodyMaxWidth);
 
       const rows = [
-        { type: 'logo', h: logoImg ? 56 : 0 },
-        { text: 'ISKCON JANMASHTAMI 2026', font: '700 15px Outfit, sans-serif', color: '#06B6D4', h: 26 },
-        { text: 'DEVOTEE ENTRY PASS', font: '800 26px Outfit, sans-serif', color: '#FFFFFF', h: 40 },
-        { type: 'tokenBox', text: data.token, h: 100 },
-        { text: data.name, font: '700 24px Outfit, sans-serif', color: '#FFFFFF', h: 36 },
-        { text: `📞 ${data.mobile || ''}`, font: '500 15px Inter, sans-serif', color: '#94A3B8', h: 22 },
+        { type: 'logo', h: logoImg ? 52 : 0 },
+        { text: 'ISKCON CHANDKHEDA CENTER INVITES YOU', font: '700 13px Outfit, sans-serif', color: '#FBBF24', h: 24 },
+        { type: 'devanagariTitle', text: 'श्री कृष्ण जन्माष्टमी', h: 62 },
+        { text: '4 September 2026 · Friday', font: '700 17px Outfit, sans-serif', color: '#FFFFFF', h: 26 },
+        { text: '3:00 PM – 12:00 Midnight', font: '600 15px Inter, sans-serif', color: '#CBD5E1', h: 22 },
+        { type: 'tokenBox', text: data.token, h: 92 },
+        { text: data.name, font: '700 23px Outfit, sans-serif', color: '#FFFFFF', h: 34 },
+        { text: `📞 ${data.mobile || ''}`, font: '500 15px Inter, sans-serif', color: '#CBD5E1', h: 22 },
         ...(addressLines.length
-          ? [{ type: 'multiline', lines: addressLines, font: '500 15px Inter, sans-serif', color: '#94A3B8', lineH: addrLineH, h: addressLines.length * addrLineH }]
+          ? [{ type: 'multiline', lines: addressLines, font: '500 15px Inter, sans-serif', color: '#CBD5E1', lineH: addrLineH, h: addressLines.length * addrLineH }]
           : []),
-        { text: `${data.persons} Family Member(s)`, font: '500 16px Inter, sans-serif', color: '#94A3B8', h: 24 },
-        ...amountBreakdownLines(data).map(line => ({ text: line, font: '500 15px Inter, sans-serif', color: '#94A3B8', h: 22 })),
+        { text: `${data.persons} Family Member(s)`, font: '500 16px Inter, sans-serif', color: '#CBD5E1', h: 24 },
+        ...amountBreakdownLines(data).map(line => ({ text: line, font: '500 15px Inter, sans-serif', color: '#CBD5E1', h: 22 })),
         { type: 'qr', h: qrSize + 20 },
+        { type: 'multiline', lines: ['Venue:', ...venueLines], font: '500 14px Inter, sans-serif', color: '#94A3B8', lineH: 19, h: (venueLines.length + 1) * 19 },
+        { text: `📞 ${EVENT_CONTACT}`, font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
       ];
 
-      const topPad = 30, bottomPad = 34, rowGap = 6;
+      const topPad = 28, bottomPad = 30, rowGap = 6;
       let totalH = topPad + bottomPad;
       rows.forEach(r => { totalH += r.h + rowGap; });
 
@@ -1911,34 +1920,47 @@
         const imgW = bgImg.width * coverScale;
         const imgH = bgImg.height * coverScale;
         ctx.drawImage(bgImg, (W - imgW) / 2, (totalH - imgH) / 2, imgW, imgH);
-        ctx.fillStyle = 'rgba(11, 19, 43, 0.82)';
+        ctx.fillStyle = 'rgba(6, 12, 28, 0.62)';
         ctx.fillRect(0, 0, W, totalH);
       } else {
-        ctx.fillStyle = '#0B132B';
+        ctx.fillStyle = '#050B1A';
         ctx.fillRect(0, 0, W, totalH);
       }
       ctx.strokeStyle = '#F59E0B';
       ctx.lineWidth = 2;
       ctx.strokeRect(1, 1, W - 2, totalH - 2);
 
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 6;
+
       let y = topPad;
       rows.forEach(r => {
         if (r.type === 'logo') {
           if (logoImg) {
+            ctx.shadowBlur = 0;
             const logoH = r.h, logoW = (logoImg.width / logoImg.height) * logoH;
             ctx.drawImage(logoImg, (W - logoW) / 2, y, logoW, logoH);
+            ctx.shadowBlur = 6;
           }
+        } else if (r.type === 'devanagariTitle') {
+          ctx.fillStyle = '#FBBF24';
+          ctx.font = "800 40px 'Yatra One', 'Noto Sans Devanagari', sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2);
         } else if (r.type === 'tokenBox') {
+          ctx.shadowBlur = 0;
           const grad = ctx.createLinearGradient(pad, y, W - pad, y);
           grad.addColorStop(0, '#F59E0B');
           grad.addColorStop(1, '#D97706');
           ctx.fillStyle = grad;
           ctx.fillRect(pad, y, W - pad * 2, r.h);
           ctx.fillStyle = '#FFFFFF';
-          ctx.font = '800 56px Outfit, sans-serif';
+          ctx.font = '800 50px Outfit, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(r.text, W / 2, y + r.h / 2 + 2);
+          ctx.shadowBlur = 6;
         } else if (r.type === 'multiline') {
           ctx.fillStyle = r.color;
           ctx.font = r.font;
@@ -1948,11 +1970,13 @@
             ctx.fillText(line, W / 2, y + r.lineH * i + r.lineH / 2);
           });
         } else if (r.type === 'qr') {
+          ctx.shadowBlur = 0;
           const qrX = (W - qrSize) / 2;
           ctx.fillStyle = '#FFFFFF';
           roundRectPath(ctx, qrX - 10, y, qrSize + 20, qrSize + 20, 12);
           ctx.fill();
           ctx.drawImage(qrCanvas, qrX, y + 10, qrSize, qrSize);
+          ctx.shadowBlur = 6;
         } else {
           ctx.fillStyle = r.color;
           ctx.font = r.font;
@@ -1990,7 +2014,7 @@
 
     function buildWhatsAppMessage(data) {
       const breakdown = amountBreakdownLines(data).join('\n');
-      return `🪈 *ISKCON Janmashtami 2026* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached invitation card image handy and show its QR code at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
+      return `🪈 *ISKCON Chandkheda Center — Śrī Kṛṣṇa Janmāṣṭamī* 🪈\n4 September 2026, Friday · 3 PM – 12 AM Midnight\n📍 ${EVENT_VENUE}\n\nHare Krishna ${data.name} ji!\n\nYour family invitation is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached invitation card image handy and show its QR code at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
     }
 
     async function sendViaWhatsApp() {

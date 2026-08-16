@@ -7,9 +7,10 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Yatra+One&family=Noto+Sans+Devanagari:wght@600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     :root {
@@ -93,15 +94,22 @@
     }
     .hidden { display: none !important; }
 
-    .token-card { text-align: center; }
-    .token-card i.fa-circle-check { font-size: 2.5rem; color: #34D399; margin-bottom: 0.75rem; }
+    .pass-card { text-align: center; }
+    .pass-card i.fa-circle-check { font-size: 2.2rem; color: #34D399; margin-bottom: 0.5rem; }
+    #invitation-capture-area { padding: 0.5rem; }
     .token-number {
       font-size: 3.2rem; font-weight: 900; letter-spacing: 2px;
       background: var(--grad-gold); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       margin: 0.35rem 0;
     }
-    .token-card .name { font-size: 1.1rem; font-weight: 600; }
-    .token-card .meta { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
+    .pass-card .pass-name { font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem; }
+    .pass-card .pass-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; line-height: 1.6; }
+    .qr-container {
+      background: white; padding: 1rem; border-radius: 16px;
+      display: inline-block; margin: 1rem 0;
+    }
+    .pass-actions { display: flex; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+    .pass-actions .btn-primary { flex: 1; min-width: 140px; margin-top: 0; }
     footer { margin-top: 2rem; color: var(--text-muted); font-size: 0.78rem; text-align: center; }
   </style>
 </head>
@@ -109,8 +117,8 @@
 
   <div class="page-header">
     <img src="iskcon_logo_icon.png" alt="ISKCON Symbol">
-    <h1>Janmashtami 2026 — Online Registration</h1>
-    <p>Register your family directly — no volunteer needed.</p>
+    <h1>ISKCON Chandkheda Center — Śrī Kṛṣṇa Janmāṣṭamī</h1>
+    <p>4 September 2026, Friday · 3 PM – 12 AM Midnight &mdash; Register your family directly, no volunteer needed.</p>
   </div>
 
   <div class="glass-card" id="form-card">
@@ -152,17 +160,34 @@
     </form>
   </div>
 
-  <div class="glass-card token-card hidden" id="success-card">
-    <i class="fa-solid fa-circle-check"></i>
-    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Registration Confirmed</div>
-    <div class="token-number" id="result-token">000</div>
-    <div class="name" id="result-name"></div>
-    <div class="meta" id="result-meta"></div>
-    <div class="note-box" id="success-note" style="margin-top: 1.25rem; text-align: left;">
-      <i class="fa-solid fa-circle-info"></i>
-      Payment received. Please save this token number and show it (or your registered mobile number) at the gate on the day of the event.
+  <div class="glass-card pass-card hidden" id="success-card">
+    <div id="invitation-capture-area">
+      <i class="fa-solid fa-circle-check"></i>
+      <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">ISKCON Janmashtami 2026</div>
+      <h2 style="color: white; font-size: 1.15rem; font-weight: 700;">DEVOTEE ENTRY PASS</h2>
+      <div class="token-number" id="result-token">000</div>
+      <div class="pass-name" id="result-name"></div>
+      <div class="pass-meta" id="result-meta"></div>
+
+      <div class="qr-container">
+        <div id="result-qrcode"></div>
+      </div>
     </div>
-    <button type="button" class="btn-primary" onclick="registerAnother()">
+
+    <div id="success-note" class="note-box" style="text-align: left;">
+      <i class="fa-solid fa-circle-info"></i>
+      Payment received. Please save this pass and show its QR code (or your registered mobile number) at the gate on the day of the event.
+    </div>
+
+    <div class="pass-actions">
+      <button type="button" class="btn-primary" style="background: #25D366;" onclick="sendViaWhatsApp()">
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+      </button>
+      <button type="button" class="btn-primary" onclick="downloadInvitationCard()">
+        <i class="fa-solid fa-download"></i> Download Pass
+      </button>
+    </div>
+    <button type="button" class="btn-primary" style="background: rgba(255, 255, 255, 0.1);" onclick="registerAnother()">
       <i class="fa-solid fa-rotate-left"></i> Register Another Family
     </button>
   </div>
@@ -191,6 +216,8 @@
       document.getElementById('reg-persons').value = 1;
       document.getElementById('success-card').classList.add('hidden');
       document.getElementById('form-card').classList.remove('hidden');
+      currentPassData = null;
+      cachedInvitationCanvas = null;
       clearError();
     }
 
@@ -217,14 +244,286 @@
       const successNote = document.getElementById('success-note');
       if (razorpayEnabled) {
         note.innerHTML = '<i class="fa-solid fa-circle-info"></i> Your entry token is confirmed instantly after payment via Razorpay (cards, UPI, netbanking, wallets all accepted).';
-        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this token number and show it (or your registered mobile number) at the gate on the day of the event.';
+        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment received. Please save this pass and show its QR code (or your registered mobile number) at the gate on the day of the event.';
       } else {
         note.innerHTML = '<i class="fa-solid fa-circle-info"></i> This reserves your family\'s entry token now. Payment details will be shared with you soon — no payment is needed to complete this registration.';
-        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Please save this token number. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show this token (or your registered mobile number) at the gate on the day of the event.';
+        successNote.innerHTML = '<i class="fa-solid fa-circle-info"></i> Please save this pass. Payment details will be shared with you soon — you can pay then, or at the entry counter. Show its QR code (or your registered mobile number) at the gate on the day of the event.';
       }
       resetSubmitBtn();
     }
     loadPaymentMode();
+
+    // ── DEVOTEE ENTRY PASS (QR-included invitation card, same design volunteers get) ──
+    let currentPassData = null;
+    let cachedInvitationCanvas = null;
+
+    function amountBreakdownLines(data) {
+      const lines = [];
+      lines.push(data.free_entry ? 'Entry: Free Pass' : `Token Entry: ₹${data.token_amount}`);
+      if (data.aarti_amount) lines.push(`Aarti Seva: ₹${data.aarti_amount}`);
+      if (data.abhishek_amount) lines.push(`Abhishek Seva: ₹${data.abhishek_amount}`);
+      if (data.donation_amount) lines.push(`Donation (80G): ₹${data.donation_amount}`);
+      if (data.payment_mode === 'pending') {
+        lines.push(`Amount Due: ₹${data.token_amount + data.aarti_amount + data.abhishek_amount + data.donation_amount}`);
+      } else {
+        lines.push(`Total Paid: ₹${data.paid}`);
+      }
+      return lines;
+    }
+
+    function showInvitationPass(data) {
+      currentPassData = data;
+      cachedInvitationCanvas = null;
+
+      document.getElementById('result-token').textContent = data.token;
+      document.getElementById('result-name').textContent = data.name;
+      document.getElementById('result-meta').innerHTML =
+        `${data.persons} Family Member(s)<br>` + amountBreakdownLines(data).join(' &middot; ');
+
+      const qrContainer = document.getElementById('result-qrcode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: data.token,
+        width: 160,
+        height: 160,
+        colorDark: '#0F172A',
+        colorLight: '#FFFFFF',
+      });
+
+      document.getElementById('form-card').classList.add('hidden');
+      document.getElementById('success-card').classList.remove('hidden');
+
+      requestAnimationFrame(() => {
+        buildInvitationCanvas().then(canvas => { cachedInvitationCanvas = canvas; });
+      });
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function wrapCanvasText(ctx, text, maxWidth) {
+      const words = text.split(' ');
+      const lines = [];
+      let current = '';
+      words.forEach(word => {
+        const test = current ? current + ' ' + word : word;
+        if (ctx.measureText(test).width > maxWidth && current) {
+          lines.push(current);
+          current = word;
+        } else {
+          current = test;
+        }
+      });
+      if (current) lines.push(current);
+      return lines;
+    }
+
+    const EVENT_VENUE = 'Sant Shri Sadaram Bapa Community Hall, 3 Maruti, New CG Road, Nigam Nagar, Chandkheda';
+    const EVENT_CONTACT = '9106572602';
+
+    async function buildInvitationCanvas() {
+      const data = currentPassData;
+      const qrCanvas = document.querySelector('#result-qrcode canvas');
+      if (!data || !qrCanvas) return null;
+
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch (e) { /* fall through with default fonts */ }
+      }
+
+      const [bgImg, logoImg] = await Promise.all([
+        loadImage('janmashtami_pass_bg.jpg').catch(() => null),
+        loadImage('iskcon_logo_icon.png').catch(() => null),
+      ]);
+
+      const scale = 2;
+      const W = 640;
+      const pad = 36;
+      const qrSize = 220;
+      const bodyMaxWidth = W - pad * 2 - 20;
+      const addrLineH = 20;
+
+      const measureCtx = document.createElement('canvas').getContext('2d');
+      measureCtx.font = '500 15px Inter, sans-serif';
+      const addressLines = data.address ? wrapCanvasText(measureCtx, `Address: ${data.address}`, bodyMaxWidth) : [];
+      measureCtx.font = '500 14px Inter, sans-serif';
+      const venueLines = wrapCanvasText(measureCtx, EVENT_VENUE, bodyMaxWidth);
+
+      const rows = [
+        { type: 'logo', h: logoImg ? 52 : 0 },
+        { text: 'ISKCON CHANDKHEDA CENTER INVITES YOU', font: '700 13px Outfit, sans-serif', color: '#FBBF24', h: 24 },
+        { type: 'devanagariTitle', text: 'श्री कृष्ण जन्माष्टमी', h: 62 },
+        { text: '4 September 2026 · Friday', font: '700 17px Outfit, sans-serif', color: '#FFFFFF', h: 26 },
+        { text: '3:00 PM – 12:00 Midnight', font: '600 15px Inter, sans-serif', color: '#CBD5E1', h: 22 },
+        { type: 'tokenBox', text: data.token, h: 92 },
+        { text: data.name, font: '700 23px Outfit, sans-serif', color: '#FFFFFF', h: 34 },
+        { text: `📞 ${data.mobile || ''}`, font: '500 15px Inter, sans-serif', color: '#CBD5E1', h: 22 },
+        ...(addressLines.length
+          ? [{ type: 'multiline', lines: addressLines, font: '500 15px Inter, sans-serif', color: '#CBD5E1', lineH: addrLineH, h: addressLines.length * addrLineH }]
+          : []),
+        { text: `${data.persons} Family Member(s)`, font: '500 16px Inter, sans-serif', color: '#CBD5E1', h: 24 },
+        ...amountBreakdownLines(data).map(line => ({ text: line, font: '500 15px Inter, sans-serif', color: '#CBD5E1', h: 22 })),
+        { type: 'qr', h: qrSize + 20 },
+        { type: 'multiline', lines: ['Venue:', ...venueLines], font: '500 14px Inter, sans-serif', color: '#94A3B8', lineH: 19, h: (venueLines.length + 1) * 19 },
+        { text: `📞 ${EVENT_CONTACT}`, font: '700 15px Outfit, sans-serif', color: '#FBBF24', h: 24 },
+      ];
+
+      const topPad = 28, bottomPad = 30, rowGap = 6;
+      let totalH = topPad + bottomPad;
+      rows.forEach(r => { totalH += r.h + rowGap; });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W * scale;
+      canvas.height = totalH * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      if (bgImg) {
+        const coverScale = Math.max(W / bgImg.width, totalH / bgImg.height);
+        const imgW = bgImg.width * coverScale;
+        const imgH = bgImg.height * coverScale;
+        ctx.drawImage(bgImg, (W - imgW) / 2, (totalH - imgH) / 2, imgW, imgH);
+        ctx.fillStyle = 'rgba(6, 12, 28, 0.62)';
+        ctx.fillRect(0, 0, W, totalH);
+      } else {
+        ctx.fillStyle = '#050B1A';
+        ctx.fillRect(0, 0, W, totalH);
+      }
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, W - 2, totalH - 2);
+
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 6;
+
+      let y = topPad;
+      rows.forEach(r => {
+        if (r.type === 'logo') {
+          if (logoImg) {
+            ctx.shadowBlur = 0;
+            const logoH = r.h, logoW = (logoImg.width / logoImg.height) * logoH;
+            ctx.drawImage(logoImg, (W - logoW) / 2, y, logoW, logoH);
+            ctx.shadowBlur = 6;
+          }
+        } else if (r.type === 'devanagariTitle') {
+          ctx.fillStyle = '#FBBF24';
+          ctx.font = "800 40px 'Yatra One', 'Noto Sans Devanagari', sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2);
+        } else if (r.type === 'tokenBox') {
+          ctx.shadowBlur = 0;
+          const grad = ctx.createLinearGradient(pad, y, W - pad, y);
+          grad.addColorStop(0, '#F59E0B');
+          grad.addColorStop(1, '#D97706');
+          ctx.fillStyle = grad;
+          ctx.fillRect(pad, y, W - pad * 2, r.h);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '800 50px Outfit, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2 + 2);
+          ctx.shadowBlur = 6;
+        } else if (r.type === 'multiline') {
+          ctx.fillStyle = r.color;
+          ctx.font = r.font;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          r.lines.forEach((line, i) => {
+            ctx.fillText(line, W / 2, y + r.lineH * i + r.lineH / 2);
+          });
+        } else if (r.type === 'qr') {
+          ctx.shadowBlur = 0;
+          const qrX = (W - qrSize) / 2;
+          ctx.fillStyle = '#FFFFFF';
+          roundRectPath(ctx, qrX - 10, y, qrSize + 20, qrSize + 20, 12);
+          ctx.fill();
+          ctx.drawImage(qrCanvas, qrX, y + 10, qrSize, qrSize);
+          ctx.shadowBlur = 6;
+        } else {
+          ctx.fillStyle = r.color;
+          ctx.font = r.font;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(r.text, W / 2, y + r.h / 2);
+        }
+        y += r.h + rowGap;
+      });
+
+      return canvas;
+    }
+
+    async function getInvitationCanvas() {
+      if (cachedInvitationCanvas) return cachedInvitationCanvas;
+      const canvas = await buildInvitationCanvas();
+      cachedInvitationCanvas = canvas;
+      return canvas;
+    }
+
+    function triggerCanvasDownload(canvas, token) {
+      const link = document.createElement('a');
+      link.download = `ISKCON_Invitation_${token}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadInvitationCard() {
+      if (!currentPassData) return null;
+      const canvas = await getInvitationCanvas();
+      if (!canvas) { alert('Could not generate the pass image.'); return null; }
+      triggerCanvasDownload(canvas, currentPassData.token);
+      return canvas;
+    }
+
+    function buildWhatsAppMessage(data) {
+      const breakdown = amountBreakdownLines(data).join('\n');
+      return `🪈 *ISKCON Chandkheda Center — Śrī Kṛṣṇa Janmāṣṭamī* 🪈\n4 September 2026, Friday · 3 PM – 12 AM Midnight\n📍 ${EVENT_VENUE}\n\nHare Krishna ${data.name} ji!\n\nYour family registration is confirmed ✅\nToken No: *${data.token}*\nFamily Members: ${data.persons}\n${breakdown}\n\n📌 Please keep the attached pass image handy and show its QR code at the gate on the day of the event for entry.\n\nJai Shri Krishna! 🙏`;
+    }
+
+    async function sendViaWhatsApp() {
+      if (!currentPassData) return;
+      const mobile = String(currentPassData.mobile || '').trim();
+      if (!/^\d{10}$/.test(mobile)) {
+        alert('No valid 10-digit mobile number on this registration to message.');
+        return;
+      }
+      const message = buildWhatsAppMessage(currentPassData);
+      const canvas = await getInvitationCanvas();
+      if (!canvas) { alert('Could not generate the pass image.'); return; }
+
+      if (navigator.canShare) {
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], `ISKCON_Invitation_${currentPassData.token}.png`, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text: message });
+            return;
+          }
+        } catch (e) {
+          if (e && e.name === 'AbortError') return;
+          console.error('Native share failed, falling back to download + wa.me:', e);
+        }
+      }
+
+      triggerCanvasDownload(canvas, currentPassData.token);
+      const waUrl = `https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+    }
 
     async function registerPending(payload, btn) {
       try {
@@ -240,11 +539,9 @@
           return;
         }
 
-        document.getElementById('result-token').textContent = data.token;
-        document.getElementById('result-name').textContent = data.name;
-        document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''}`;
-        document.getElementById('form-card').classList.add('hidden');
-        document.getElementById('success-card').classList.remove('hidden');
+        data.mobile = payload.mobile;
+        data.address = payload.address;
+        showInvitationPass(data);
       } catch (err) {
         showError('Could not reach the server. Please check your connection and try again.');
         resetSubmitBtn();
@@ -301,11 +598,9 @@
               return;
             }
 
-            document.getElementById('result-token').textContent = data.token;
-            document.getElementById('result-name').textContent = data.name;
-            document.getElementById('result-meta').textContent = `${data.persons} family member${data.persons > 1 ? 's' : ''} · ₹${data.paid} paid`;
-            document.getElementById('form-card').classList.add('hidden');
-            document.getElementById('success-card').classList.remove('hidden');
+            data.mobile = payload.mobile;
+            data.address = payload.address;
+            showInvitationPass(data);
           } catch (err) {
             showError('Payment succeeded but we could not reach the server to confirm your token. Your payment ID: ' + response.razorpay_payment_id + ' — please save this and contact us.');
             resetSubmitBtn();
