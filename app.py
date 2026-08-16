@@ -1267,6 +1267,9 @@ def gate_lookup():
             'already_in': already_in,
             'remaining': remaining,
             'gate_time': gate_time,
+            'payment_mode': reg['payment_mode'],
+            'amount_due': reg['token_amount'] + reg['aarti_amount'] + reg['abhishek_amount'] + reg['donation_amount'],
+            'paid': reg['paid'],
         })
     except Exception as e:
         log.error(f'gate_lookup error: {e}')

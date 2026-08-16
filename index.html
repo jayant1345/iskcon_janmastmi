@@ -2343,7 +2343,12 @@
           badge.className = 'badge badge-warning';
           badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> FULLY CHECKED IN';
           nameEl.textContent = data.name;
-          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem;">Token #${data.token}</span> All ${data.registered}/${data.registered} family member(s) already inside (last entry at ${data.gate_time}).`;
+          const fullyInWarning = data.payment_mode === 'pending'
+            ? `<div style="margin-top: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 8px; color: #FCA5A5; font-weight: 600;">
+                 <i class="fa-solid fa-triangle-exclamation"></i> Payment Pending — ₹${data.amount_due} due. Please collect payment (Registrations tab → Collect Cash/UPI).
+               </div>`
+            : '';
+          detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem;">Token #${data.token}</span> All ${data.registered}/${data.registered} family member(s) already inside (last entry at ${data.gate_time}).${fullyInWarning}`;
           return;
         }
 
@@ -2352,7 +2357,12 @@
           ? '<i class="fa-solid fa-user-clock"></i> PARTIALLY CHECKED IN'
           : '<i class="fa-solid fa-circle-check"></i> READY TO ENTER';
         nameEl.textContent = data.name;
-        detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> Registered: <strong>${data.registered}</strong> | Already inside: <strong>${data.already_in}</strong> | Remaining: <strong>${data.remaining}</strong>`;
+        const paymentWarning = data.payment_mode === 'pending'
+          ? `<div style="margin-top: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 8px; color: #FCA5A5; font-weight: 600;">
+               <i class="fa-solid fa-triangle-exclamation"></i> Payment Pending — ₹${data.amount_due} due. Entry is still allowed, but please collect payment (Registrations tab → Collect Cash/UPI).
+             </div>`
+          : '';
+        detEl.innerHTML = `<span class="token-badge" style="margin-right: 0.5rem; background: var(--grad-morpankh); color: #030D22;">Token #${data.token}</span> Registered: <strong>${data.registered}</strong> | Already inside: <strong>${data.already_in}</strong> | Remaining: <strong>${data.remaining}</strong>${paymentWarning}`;
 
         document.getElementById('scan-confirm-label').textContent = data.already_in > 0
           ? 'How many more are entering now?'
