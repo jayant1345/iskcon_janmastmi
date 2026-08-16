@@ -643,7 +643,7 @@
           resetSubmitBtn();
           return;
         }
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Redirecting to payment...';
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Redirecting to pay ₹${link.amount}...`;
         window.location.href = link.short_url;
       } catch (err) {
         showError('Could not reach the server. Please check your connection and try again.');

@@ -996,7 +996,7 @@ def create_razorpay_payment_link():
                 'persons': persons,
             },
         })
-        return jsonify({'short_url': link['short_url'], 'id': link['id']})
+        return jsonify({'short_url': link['short_url'], 'id': link['id'], 'amount': amount_paise // 100, 'persons': persons})
     except Exception as e:
         log.error(f'razorpay payment_link create error: {e}')
         return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
