@@ -1034,6 +1034,7 @@
                   <th>Category</th>
                   <th>Registered By</th>
                   <th>Status</th>
+                  <th>Pass</th>
                   <th id="reg-actions-header" class="hidden">Actions</th>
                 </tr>
               </thead>
@@ -2430,10 +2431,13 @@
       return '₹' + r.paid;
     }
 
+    let allRegistrationsByToken = {};
+
     async function loadRegistrations() {
       try {
         const res = await fetch(`${API_BASE}/api/registrations`, { credentials: 'include' });
         const data = await res.json();
+        allRegistrationsByToken = Object.fromEntries(data.registrations.map(r => [r.token, r]));
         const tbody = document.getElementById('registrations-table-body');
         tbody.innerHTML = data.registrations.map(r => `
           <tr data-category="${r.category || 'volunteer'}">
@@ -2448,6 +2452,11 @@
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
             </td>
+            <td>
+              <button onclick="reprintPass('${r.token}')" style="font-size:0.7rem; padding:0.3rem 0.6rem; border-radius:6px; border:1px solid var(--accent-peacock); background:rgba(0,229,255,0.12); color:var(--accent-peacock); cursor:pointer; font-weight:600; white-space:nowrap;">
+                <i class="fa-solid fa-id-card"></i> Pass
+              </button>
+            </td>
             ${currentUser && currentUser.role === 'admin' ? `
             <td>
               <button onclick="deleteRegistration('${r.token}', '${String(r.name || '').replace(/'/g, "\\'")}')" style="font-size:0.7rem; padding:0.3rem 0.6rem; border-radius:6px; border:1px solid var(--danger); background:rgba(239,68,68,0.12); color:#FCA5A5; cursor:pointer; font-weight:600; white-space:nowrap;">
@@ -2459,6 +2468,12 @@
       } catch (err) {
         console.error('Registrations load error:', err);
       }
+    }
+
+    function reprintPass(token) {
+      const r = allRegistrationsByToken[token];
+      if (!r) { alert('Registration not found. Try refreshing the list.'); return; }
+      showTokenModal(r);
     }
 
     async function deleteRegistration(token, name) {
