@@ -2518,8 +2518,32 @@
       }
     }
 
-    function downloadCSVReport() {
-      window.open(`${API_BASE}/api/export/csv`, '_blank');
+    async function downloadCSVReport() {
+      try {
+        const res = await fetch(`${API_BASE}/api/export/csv`, { credentials: 'include' });
+        if (res.status === 401) {
+          alert('Your session has expired. Please log in again, then try downloading the report.');
+          currentUser = null;
+          showLoginView();
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert('Could not generate the report: ' + (err.error || `Server error (${res.status})`));
+          return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'iskcon_janmastmi_report_2026.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Could not reach the server to download the report. Please check your connection and try again.');
+      }
     }
 
     const CLEAR_DATA_SECRET = 'ISKCON_JANMASTMI_CLEAR_2026';
