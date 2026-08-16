@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS settings (
     token_rate     INT NOT NULL DEFAULT 20,   -- Rs per person entry token charge
     aarti_price    INT NOT NULL DEFAULT 101,  -- Suggested Aarti seva price
     abhishek_price INT NOT NULL DEFAULT 251,  -- Suggested Abhishek seva price
-    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    tz_backfilled  TINYINT(1) NOT NULL DEFAULT 0 -- Internal flag: one-time UTC->IST timestamp backfill has run
 ) ENGINE=InnoDB;
 
 INSERT IGNORE INTO settings (id, token_rate, aarti_price, abhishek_price) VALUES (1, 20, 101, 251);

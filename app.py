@@ -65,7 +65,16 @@ DB_CONFIG = {
     'charset':  'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor,
     'autocommit': True,
+    # The event is in India; without this every connection defaults to UTC, so
+    # CURRENT_TIMESTAMP/NOW() (and every DATETIME column that relies on them)
+    # silently store/report UTC instead of IST.
+    'init_command': "SET time_zone = '+05:30'",
 }
+
+IST_OFFSET = timedelta(hours=5, minutes=30)
+def ist_now():
+    """IST wall-clock time, independent of the host container's local TZ."""
+    return datetime.utcnow() + IST_OFFSET
 
 def get_db():
     return pymysql.connect(**DB_CONFIG)
@@ -202,6 +211,7 @@ def init_db():
                 ('registrations', 'collected_by',         "ALTER TABLE registrations ADD COLUMN collected_by INT NULL"),
                 ('attendance',    'scanned_by',          "ALTER TABLE attendance ADD COLUMN scanned_by INT NULL"),
                 ('users',         'upi_id',              "ALTER TABLE users ADD COLUMN upi_id VARCHAR(100) NULL"),
+                ('settings',      'tz_backfilled',       "ALTER TABLE settings ADD COLUMN tz_backfilled TINYINT(1) NOT NULL DEFAULT 0"),
             ]
             for table, col_name, col_sql in migrations:
                 try:
@@ -221,6 +231,29 @@ def init_db():
                         log.error(f'Migration error ({table}.{col_name}): {me}')
                 except Exception as me:
                     log.error(f'Migration error ({table}.{col_name}): {me}')
+
+            # ── One-time IST backfill ──
+            # Every DATETIME column here was written before this connection started
+            # forcing session time_zone='+05:30', so existing rows hold UTC wall-clock
+            # values (5:30 behind the intended IST). Shift them forward exactly once.
+            # The conditional UPDATE below is an atomic claim: only the worker that
+            # actually flips 0->1 runs the backfill, so concurrent gunicorn workers
+            # racing here on startup can't double-shift the data.
+            try:
+                cur.execute("UPDATE settings SET tz_backfilled = 1 WHERE id = 1 AND tz_backfilled = 0")
+                if cur.rowcount == 1:
+                    for table, col in (
+                        ('registrations', 'reg_at'),
+                        ('attendance', 'gate_time'),
+                        ('attendance_log', 'scan_time'),
+                        ('settlements', 'created_at'),
+                        ('users', 'created_at'),
+                    ):
+                        cur.execute(f"UPDATE {table} SET {col} = DATE_ADD({col}, INTERVAL 330 MINUTE)")
+                    conn.commit()
+                    log.info('Timezone backfill: shifted existing UTC timestamps to IST (+5:30).')
+            except Exception as me:
+                log.error(f'Timezone backfill error: {me}')
 
             # ── Seed default admin user ──
             admin_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -830,7 +863,7 @@ def _create_registration(data, registered_by, category):
             'free_entry':      free_entry,
             'payment_mode':    payment_mode,
             'category':        category,
-            'reg_at':          datetime.now().strftime('%d/%m/%Y %H:%M'),
+            'reg_at':          ist_now().strftime('%d/%m/%Y %H:%M'),
         }), 201
     except Exception as e:
         log.error(f'register error: {e}')
@@ -1163,7 +1196,7 @@ def gate_scan():
             (token, actual_persons, scanned_by)
         )
 
-        now_str = datetime.now().strftime('%H:%M:%S')
+        now_str = ist_now().strftime('%H:%M:%S')
         log.info(f'Janmashtami Gate Entry Granted: Token={token} Name={actual_name} Members={actual_persons} ScannedBy={session.get("username")}')
         return jsonify({
             'status':    'success',
