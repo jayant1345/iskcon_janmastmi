@@ -85,6 +85,20 @@
       background: rgba(0, 229, 255, 0.1); color: var(--accent-peacock); font-size: 1.3rem; font-weight: 700; cursor: pointer;
     }
     .counter-btn:hover { background: var(--accent-peacock); color: #030D22; }
+    .seva-option {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.7rem 0.9rem; border: 1px solid var(--border-peacock); border-radius: 12px;
+      background: rgba(3, 13, 34, 0.55); margin-bottom: 0.55rem; cursor: pointer;
+    }
+    .seva-option input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-peacock); flex-shrink: 0; }
+    .seva-option .seva-label { flex: 1; font-size: 0.85rem; }
+    .seva-option .seva-price { font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem; white-space: nowrap; }
+    .total-box {
+      background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-peacock); border-radius: 12px;
+      padding: 0.85rem 1.1rem; margin: 0.25rem 0 1.1rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    .total-box .total-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+    .total-box .total-amount { font-size: 1.35rem; font-weight: 800; background: var(--grad-gold); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .btn-primary {
       background: var(--grad-peacock-btn); color: white; font-weight: 700; font-size: 1rem;
       padding: 0.9rem 1.8rem; border-radius: 12px; border: none; cursor: pointer; width: 100%;
@@ -139,9 +153,7 @@
     <div class="note-box" id="pricing-note">
       <i class="fa-solid fa-indian-rupee-sign"></i>
       Entry Token: <strong>₹50 per person</strong> (includes complete full Prasādam).
-      <br><span style="opacity: 0.85;">Optional Sevas (contact volunteers at the venue) &mdash;
-      Aarti with family: ₹500 &middot; Abhishek with family: ₹1100 &middot;
-      Silver Kalash Abhishek with family: ₹2500 &middot; Golden Kalash Abhishek with family: ₹5001.</span>
+      <br><span style="opacity: 0.85;">Optional Sevas below can be added and paid together with your entry token.</span>
     </div>
 
     <div id="error-box" class="error-box hidden"></div>
@@ -169,6 +181,35 @@
           <input type="number" id="reg-persons" class="form-control" value="1" min="1" max="50" style="text-align: center;" readonly>
           <button type="button" class="counter-btn" onclick="updatePersons(1)">+</button>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Optional Sevas</label>
+        <label class="seva-option">
+          <input type="checkbox" id="seva-aarti" onchange="updateTotalAmount()">
+          <span class="seva-label">Aarti with family</span>
+          <span class="seva-price">₹500</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="abhishek" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Abhishek with family</span>
+          <span class="seva-price">₹1100</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="silver_kalash" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Silver Kalash Abhishek with family</span>
+          <span class="seva-price">₹2500</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="golden_kalash" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Golden Kalash Abhishek with family</span>
+          <span class="seva-price">₹5001</span>
+        </label>
+      </div>
+
+      <div class="total-box">
+        <span class="total-label">Total Amount</span>
+        <span class="total-amount" id="total-amount-display">₹50</span>
       </div>
 
       <button type="submit" class="btn-primary" id="submit-btn">
@@ -217,6 +258,36 @@
       let val = parseInt(input.value, 10) || 1;
       val = Math.min(50, Math.max(1, val + delta));
       input.value = val;
+      updateTotalAmount();
+    }
+
+    // ── Optional seva pricing (loaded from server config so it can never drift
+    // from what actually gets charged -- see loadPaymentMode()) ──
+    let PRICE_RATE = 50;
+    let PRICE_AARTI = 500;
+    let PRICE_ABHISHEK_TIERS = { abhishek: 1100, silver_kalash: 2500, golden_kalash: 5001 };
+
+    function onAbhishekTierChange(cb) {
+      if (cb.checked) {
+        document.querySelectorAll('.abhishek-tier').forEach(other => {
+          if (other !== cb) other.checked = false;
+        });
+      }
+      updateTotalAmount();
+    }
+
+    function getSelectedAbhishekTier() {
+      const checked = document.querySelector('.abhishek-tier:checked');
+      return checked ? checked.value : 'none';
+    }
+
+    function updateTotalAmount() {
+      const persons = parseInt(document.getElementById('reg-persons').value, 10) || 1;
+      let total = persons * PRICE_RATE;
+      if (document.getElementById('seva-aarti').checked) total += PRICE_AARTI;
+      const tier = getSelectedAbhishekTier();
+      if (tier !== 'none') total += (PRICE_ABHISHEK_TIERS[tier] || 0);
+      document.getElementById('total-amount-display').textContent = `₹${total}`;
     }
 
     function showError(msg) {
@@ -236,6 +307,7 @@
       currentPassData = null;
       cachedInvitationCanvas = null;
       clearError();
+      updateTotalAmount();
     }
 
     let paymentMode = 'pending'; // 'pending' | 'razorpay' | 'payment_link' -- updated from server config on load
@@ -269,6 +341,15 @@
         const res = await fetch('/api/register/public/config');
         const data = await res.json();
         paymentMode = data.mode || 'pending';
+        if (data.token_rate) PRICE_RATE = data.token_rate;
+        if (data.aarti_price) PRICE_AARTI = data.aarti_price;
+        if (data.abhishek_tiers) PRICE_ABHISHEK_TIERS = data.abhishek_tiers;
+        document.querySelector('#pricing-note strong').textContent = `₹${PRICE_RATE} per person`;
+        document.querySelectorAll('.seva-option')[0].querySelector('.seva-price').textContent = `₹${PRICE_AARTI}`;
+        document.querySelectorAll('.abhishek-tier').forEach(cb => {
+          cb.closest('.seva-option').querySelector('.seva-price').textContent = `₹${PRICE_ABHISHEK_TIERS[cb.value] || ''}`;
+        });
+        updateTotalAmount();
       } catch (err) {
         paymentMode = 'pending'; // if we can't tell, don't block registration on payment
       }
@@ -294,11 +375,17 @@
     let currentPassData = null;
     let cachedInvitationCanvas = null;
 
+    function abhishekLabel(amount) {
+      if (amount === 2500) return 'Silver Kalash Abhishek';
+      if (amount === 5001) return 'Golden Kalash Abhishek';
+      return 'Abhishek Seva';
+    }
+
     function amountBreakdownLines(data) {
       const lines = [];
       lines.push(data.free_entry ? 'Entry: Free Pass' : `Token Entry: ₹${data.token_amount}`);
       if (data.aarti_amount) lines.push(`Aarti Seva: ₹${data.aarti_amount}`);
-      if (data.abhishek_amount) lines.push(`Abhishek Seva: ₹${data.abhishek_amount}`);
+      if (data.abhishek_amount) lines.push(`${abhishekLabel(data.abhishek_amount)}: ₹${data.abhishek_amount}`);
       if (data.donation_amount) lines.push(`Donation (80G): ₹${data.donation_amount}`);
       if (data.payment_mode === 'pending') {
         lines.push(`Amount Due: ₹${data.token_amount + data.aarti_amount + data.abhishek_amount + data.donation_amount}`);
@@ -751,7 +838,9 @@
         currency: order.currency,
         order_id: order.order_id,
         name: 'ISKCON Janmashtami 2026',
-        description: `Entry token — ${payload.persons} family member${payload.persons > 1 ? 's' : ''}`,
+        description: `Entry token — ${payload.persons} family member${payload.persons > 1 ? 's' : ''}`
+          + (payload.aarti ? ' + Aarti' : '')
+          + (payload.abhishek_tier && payload.abhishek_tier !== 'none' ? ` + ${abhishekLabel(PRICE_ABHISHEK_TIERS[payload.abhishek_tier])}` : ''),
         image: 'iskcon_logo_icon.png',
         prefill: { name: payload.name, contact: payload.mobile },
         theme: { color: '#F59E0B' },
@@ -872,6 +961,8 @@
         mobile: document.getElementById('reg-mobile').value.trim(),
         address: document.getElementById('reg-address').value.trim(),
         persons: parseInt(document.getElementById('reg-persons').value, 10) || 1,
+        aarti: document.getElementById('seva-aarti').checked,
+        abhishek_tier: getSelectedAbhishekTier(),
       };
 
       const btn = document.getElementById('submit-btn');
