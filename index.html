@@ -965,11 +965,17 @@
           <div class="glass-card">
             <div class="glass-card-title" style="justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
               <span><i class="fa-solid fa-qrcode"></i> Gate QR Attendance Scanner</span>
-              <button type="button" class="nav-tab" onclick="playChimeSound()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
-                <i class="fa-solid fa-volume-high"></i> Test Devotional Sound
-              </button>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="nav-tab" onclick="restartScanner()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
+                  <i class="fa-solid fa-rotate"></i> Restart Camera
+                </button>
+                <button type="button" class="nav-tab" onclick="playChimeSound()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
+                  <i class="fa-solid fa-volume-high"></i> Test Devotional Sound
+                </button>
+              </div>
             </div>
 
+            <div id="qr-reader-status" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;"></div>
             <div id="qr-reader"></div>
 
             <div style="margin-bottom: 1.5rem; position: relative;">
@@ -2356,30 +2362,62 @@
     let lastScannedToken = null;
     let lastScanAt = 0;
 
-    function initScanner() {
+    function setScannerStatus(text, isError) {
+      const el = document.getElementById('qr-reader-status');
+      if (el) { el.textContent = text; el.style.color = isError ? '#FCA5A5' : 'var(--text-muted)'; }
+    }
+
+    function onScanDecoded(tokenStr) {
+      // The same QR code sitting in frame decodes ~10x/sec -- without this the same
+      // scan would re-fire the lookup + chime every ~100ms while it's held up.
+      const now = Date.now();
+      if (tokenStr === lastScannedToken && now - lastScanAt < 4000) return;
+      lastScannedToken = tokenStr;
+      lastScanAt = now;
+      processTokenCheck(tokenStr);
+    }
+
+    function startWithConfig(cameraConfig, label) {
+      setScannerStatus(`Starting camera (${label})…`);
+      return html5QrCode.start(cameraConfig, { fps: 10, qrbox: 250 }, onScanDecoded, () => {})
+        .then(() => {
+          scannerRunning = true;
+          setScannerStatus('Camera live — point at a devotee\'s QR pass');
+        });
+    }
+
+    async function initScanner() {
       if (scannerRunning) return;
       const qrReaderEl = document.getElementById('qr-reader');
       if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
-      qrReaderEl.innerHTML = '<p style="color: var(--text-muted); padding: 1.5rem; text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Starting camera&hellip;</p>';
+      qrReaderEl.innerHTML = '';
+      setScannerStatus('Requesting camera…');
 
-      html5QrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: 250 },
-        (tokenStr) => {
-          // The same QR code sitting in frame decodes ~10x/sec -- without this the
-          // same scan would re-fire the lookup + chime every ~100ms while it's held up.
-          const now = Date.now();
-          if (tokenStr === lastScannedToken && now - lastScanAt < 4000) return;
-          lastScannedToken = tokenStr;
-          lastScanAt = now;
-          processTokenCheck(tokenStr);
-        },
-        () => {}, // per-frame "no QR in view" noise, ignore
-      ).then(() => {
-        scannerRunning = true;
-      }).catch((err) => {
-        qrReaderEl.innerHTML = `<p style="color: #FCA5A5; padding: 1.5rem; text-align: center;"><i class="fa-solid fa-triangle-exclamation"></i> Camera could not start (${err}). Use the token/mobile search box below instead.</p>`;
-      });
+      try {
+        await startWithConfig({ facingMode: 'environment' }, 'rear');
+        return;
+      } catch (err) {
+        console.error('Rear-camera facingMode start failed, trying camera list fallback:', err);
+      }
+
+      // Some phone/browser combinations don't honor a facingMode constraint at all --
+      // fall back to explicitly enumerating cameras and picking the one whose label
+      // says "back"/"rear", or the last one in the list (commonly the rear camera on
+      // multi-camera Android phones when facingMode isn't supported).
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || !cameras.length) throw new Error('No cameras reported by browser');
+        const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+        await startWithConfig(backCam.id, backCam.label || 'fallback');
+      } catch (err2) {
+        console.error('Camera fallback also failed:', err2);
+        setScannerStatus(`Camera could not start: ${err2.message || err2}. Tap "Restart Camera" to retry, or use the search box below.`, true);
+      }
+    }
+
+    function restartScanner() {
+      stopScanner();
+      setTimeout(initScanner, 300);
     }
 
     function stopScanner() {
