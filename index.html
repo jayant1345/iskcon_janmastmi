@@ -966,8 +966,8 @@
             <div class="glass-card-title" style="justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
               <span><i class="fa-solid fa-qrcode"></i> Gate QR Attendance Scanner</span>
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button type="button" class="nav-tab" onclick="restartScanner()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
-                  <i class="fa-solid fa-rotate"></i> Restart Camera
+                <button type="button" id="scanner-toggle-btn" class="nav-tab" onclick="toggleScanner()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
+                  <i class="fa-solid fa-video-slash"></i> Turn Camera Off
                 </button>
                 <button type="button" class="nav-tab" onclick="playChimeSound()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: rgba(0, 229, 255, 0.15); border: 1px solid var(--accent-peacock); color: white;">
                   <i class="fa-solid fa-volume-high"></i> Test Devotional Sound
@@ -2367,6 +2367,23 @@
       if (el) { el.textContent = text; el.style.color = isError ? '#FCA5A5' : 'var(--text-muted)'; }
     }
 
+    function updateScannerToggleBtn() {
+      const btn = document.getElementById('scanner-toggle-btn');
+      if (!btn) return;
+      btn.innerHTML = scannerRunning
+        ? '<i class="fa-solid fa-video-slash"></i> Turn Camera Off'
+        : '<i class="fa-solid fa-video"></i> Turn Camera On';
+    }
+
+    function toggleScanner() {
+      if (scannerRunning) {
+        stopScanner();
+        setScannerStatus('Camera off. Tap "Turn Camera On" when ready for the next family.');
+      } else {
+        initScanner();
+      }
+    }
+
     function onScanDecoded(tokenStr) {
       // The same QR code sitting in frame decodes ~10x/sec -- without this the same
       // scan would re-fire the lookup + chime every ~100ms while it's held up.
@@ -2383,6 +2400,7 @@
         .then(() => {
           scannerRunning = true;
           setScannerStatus('Camera live — point at a devotee\'s QR pass');
+          updateScannerToggleBtn();
         });
     }
 
@@ -2411,19 +2429,16 @@
         await startWithConfig(backCam.id, backCam.label || 'fallback');
       } catch (err2) {
         console.error('Camera fallback also failed:', err2);
-        setScannerStatus(`Camera could not start: ${err2.message || err2}. Tap "Restart Camera" to retry, or use the search box below.`, true);
+        setScannerStatus(`Camera could not start: ${err2.message || err2}. Tap "Turn Camera On" to retry, or use the search box below.`, true);
+        updateScannerToggleBtn();
       }
-    }
-
-    function restartScanner() {
-      stopScanner();
-      setTimeout(initScanner, 300);
     }
 
     function stopScanner() {
       if (!html5QrCode || !scannerRunning) return;
       scannerRunning = false;
       html5QrCode.stop().catch(() => {});
+      updateScannerToggleBtn();
     }
 
     document.getElementById('manual-scan-form').addEventListener('submit', (e) => {
@@ -2538,6 +2553,11 @@
           document.getElementById('scan-confirm-container').classList.add('hidden');
           loadDashboardStats();
           loadAttendanceLog();
+          // Entry for this family is done -- turn the camera off automatically so it's
+          // not still actively decoding while the volunteer talks to the family or
+          // walks away. They tap "Turn Camera On" when ready for the next one.
+          stopScanner();
+          setScannerStatus('Entry confirmed. Camera off — tap "Turn Camera On" for the next family.');
         } else {
           // State likely changed since lookup (e.g. another gate scanned this token) -- resync.
           playWarningSound();
