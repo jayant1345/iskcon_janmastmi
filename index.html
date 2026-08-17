@@ -1313,7 +1313,7 @@
   <script>
     const API_BASE = window.location.origin;
     let currentUser = null;
-    let html5QrCodeScanner = null;
+    let html5QrCode = null;
     let currentScannedToken = null;
 
     // ── Shared audio setup, unlocked by the first tap anywhere on the page ──
@@ -1443,7 +1443,7 @@
       if (tabId === 'dashboard') loadDashboardStats();
       if (tabId === 'registrations') loadRegistrations();
       if (tabId === 'attendance') loadAttendanceLog();
-      if (tabId === 'scan') initScanner();
+      if (tabId === 'scan') initScanner(); else stopScanner();
       if (tabId === 'users' && currentUser.role === 'admin') {
         loadUsersList();
         populateSettingsForm();
@@ -2347,22 +2347,45 @@
       }
     });
 
+    // Html5QrcodeScanner (the "turnkey UI" class) always renders its own camera-select
+    // dropdown plus Start/Stop Scanning buttons with no way to suppress them -- that's
+    // exactly the manual step volunteers were complaining about. Html5Qrcode is the
+    // lower-level class: we call .start() ourselves the instant this tab opens, so the
+    // camera comes on automatically with no button tap required.
+    let scannerRunning = false;
+    let lastScannedToken = null;
+    let lastScanAt = 0;
+
     function initScanner() {
-      if (html5QrCodeScanner) return;
-      html5QrCodeScanner = new Html5QrcodeScanner("qr-reader", {
-        fps: 10,
-        qrbox: 250,
-        // Without this, the library just grabs whichever camera the device happens to
-        // enumerate first -- on many phones that's the front/selfie camera, which is
-        // useless for scanning a QR code someone else is holding up. This forces the
-        // rear camera. rememberLastUsedCamera also skips the picker on repeat visits
-        // once a working camera has been chosen once.
-        videoConstraints: { facingMode: { ideal: 'environment' } },
-        rememberLastUsedCamera: true,
+      if (scannerRunning) return;
+      const qrReaderEl = document.getElementById('qr-reader');
+      if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
+      qrReaderEl.innerHTML = '<p style="color: var(--text-muted); padding: 1.5rem; text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Starting camera&hellip;</p>';
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        (tokenStr) => {
+          // The same QR code sitting in frame decodes ~10x/sec -- without this the
+          // same scan would re-fire the lookup + chime every ~100ms while it's held up.
+          const now = Date.now();
+          if (tokenStr === lastScannedToken && now - lastScanAt < 4000) return;
+          lastScannedToken = tokenStr;
+          lastScanAt = now;
+          processTokenCheck(tokenStr);
+        },
+        () => {}, // per-frame "no QR in view" noise, ignore
+      ).then(() => {
+        scannerRunning = true;
+      }).catch((err) => {
+        qrReaderEl.innerHTML = `<p style="color: #FCA5A5; padding: 1.5rem; text-align: center;"><i class="fa-solid fa-triangle-exclamation"></i> Camera could not start (${err}). Use the token/mobile search box below instead.</p>`;
       });
-      html5QrCodeScanner.render((tokenStr) => {
-        processTokenCheck(tokenStr);
-      }, (err) => {});
+    }
+
+    function stopScanner() {
+      if (!html5QrCode || !scannerRunning) return;
+      scannerRunning = false;
+      html5QrCode.stop().catch(() => {});
     }
 
     document.getElementById('manual-scan-form').addEventListener('submit', (e) => {
@@ -2402,6 +2425,7 @@
         document.getElementById('manual-token').value = data.token;
 
         if (data.remaining <= 0) {
+          playWarningSound(); // duplicate scan -- this family is already fully inside
           badge.className = 'badge badge-warning';
           badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> FULLY CHECKED IN';
           nameEl.textContent = data.name;
@@ -2414,6 +2438,10 @@
           return;
         }
 
+        // Immediate audio feedback the moment a valid, enterable pass is scanned --
+        // previously the chime only fired after the separate "Confirm Entry" tap, so
+        // scanning itself was silent even on a successful read.
+        playChimeSound();
         badge.className = 'badge badge-success';
         badge.innerHTML = data.already_in > 0
           ? '<i class="fa-solid fa-user-clock"></i> PARTIALLY CHECKED IN'
