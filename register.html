@@ -381,8 +381,19 @@
       const qrCanvas = document.querySelector('#result-qrcode canvas');
       if (!data || !qrCanvas) return null;
 
-      if (document.fonts && document.fonts.ready) {
-        try { await document.fonts.ready; } catch (e) { /* fall through with default fonts */ }
+      if (document.fonts) {
+        try {
+          // document.fonts.ready alone only waits for fonts the page has already
+          // started loading -- Yatra One / Noto Sans Devanagari are never used by
+          // any visible DOM text, so nothing triggers their download and the canvas
+          // silently falls back to a generic font for the Devanagari title. Force
+          // the exact face/weight/size used below so it's actually fetched first.
+          await Promise.all([
+            document.fonts.load("800 40px 'Yatra One'"),
+            document.fonts.load("800 40px 'Noto Sans Devanagari'"),
+          ]);
+          await document.fonts.ready;
+        } catch (e) { /* fall through with default fonts */ }
       }
 
       const [bgImg, logoImg] = await Promise.all([
