@@ -1316,6 +1316,30 @@
     let html5QrCodeScanner = null;
     let currentScannedToken = null;
 
+    // ── Shared audio setup, unlocked by the first tap anywhere on the page ──
+    // Mobile browsers only allow audio playback that traces back to a real user
+    // gesture. A fresh `new Audio()` / `new AudioContext()` created at the moment of
+    // a scan is *usually* fine since it's still inside a click handler, but an
+    // AudioContext starts life "suspended" on many mobile browsers and needs an
+    // explicit resume() tied to a gesture before it will actually produce sound --
+    // scheduling oscillators on a suspended context fails silently (no error, no
+    // sound). Pre-creating and unlocking both here on first touch removes that gap.
+    const sharedChimeAudio = new Audio('hare_krishna_chime.mp3');
+    sharedChimeAudio.preload = 'auto';
+    let sharedAudioCtx = null;
+    function getAudioCtx() {
+      if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return sharedAudioCtx;
+    }
+    function unlockAudioOnce() {
+      getAudioCtx().resume().catch(() => {});
+      sharedChimeAudio.play().then(() => { sharedChimeAudio.pause(); sharedChimeAudio.currentTime = 0; }).catch(() => {});
+      document.removeEventListener('touchstart', unlockAudioOnce);
+      document.removeEventListener('click', unlockAudioOnce);
+    }
+    document.addEventListener('touchstart', unlockAudioOnce, { once: true });
+    document.addEventListener('click', unlockAudioOnce, { once: true });
+
     // Initial load
     document.addEventListener('DOMContentLoaded', () => {
       checkAuth();
@@ -2193,9 +2217,9 @@
     // ── SCANNER ──
     function playChimeSound() {
       try {
-        const audio = new Audio('hare_krishna_chime.mp3');
-        audio.volume = 1.0;
-        audio.play().catch((e) => {
+        sharedChimeAudio.currentTime = 0;
+        sharedChimeAudio.volume = 1.0;
+        sharedChimeAudio.play().catch((e) => {
           console.error('Hare Krishna chime playback failed, using fallback bell:', e);
           playSynthBellFallback();
         });
@@ -2206,28 +2230,35 @@
 
     function playSynthBellFallback() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Authentic ISKCON Temple Brass Bell Multi-Harmonic Sound Algorithm
-        const bellFrequencies = [440, 880, 1320, 1760, 2640];
-        const now = ctx.currentTime;
+        const ctx = getAudioCtx();
+        const start = () => {
+          // Authentic ISKCON Temple Brass Bell Multi-Harmonic Sound Algorithm
+          const bellFrequencies = [440, 880, 1320, 1760, 2640];
+          const now = ctx.currentTime;
 
-        [0, 0.18, 0.40].forEach((delay, strikeIdx) => {
-          bellFrequencies.forEach((freq, hIdx) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = hIdx % 2 === 0 ? 'sine' : 'triangle';
-            osc.frequency.setValueAtTime(freq * (strikeIdx === 2 ? 1.25 : 1), now + delay);
+          [0, 0.18, 0.40].forEach((delay, strikeIdx) => {
+            bellFrequencies.forEach((freq, hIdx) => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = hIdx % 2 === 0 ? 'sine' : 'triangle';
+              osc.frequency.setValueAtTime(freq * (strikeIdx === 2 ? 1.25 : 1), now + delay);
 
-            const vol = 0.25 / (hIdx + 1);
-            gain.gain.setValueAtTime(vol, now + delay);
-            gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + (1.2 - hIdx * 0.15));
+              const vol = 0.25 / (hIdx + 1);
+              gain.gain.setValueAtTime(vol, now + delay);
+              gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + (1.2 - hIdx * 0.15));
 
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + delay);
-            osc.stop(now + delay + 1.2);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start(now + delay);
+              osc.stop(now + delay + 1.2);
+            });
           });
-        });
+        };
+        // A suspended context schedules oscillators with zero audible output and no
+        // error -- must resume() first (this is *why* the fallback bell could go
+        // silent on mobile even though nothing throws).
+        if (ctx.state === 'suspended') ctx.resume().then(start).catch(start);
+        else start();
       } catch (e) {
         console.error('Audio chime error:', e);
       }
@@ -2235,18 +2266,22 @@
 
     function playWarningSound() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(220, ctx.currentTime);
-        osc.frequency.setValueAtTime(180, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.4);
+        const ctx = getAudioCtx();
+        const start = () => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, ctx.currentTime);
+          osc.frequency.setValueAtTime(180, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.4);
+        };
+        if (ctx.state === 'suspended') ctx.resume().then(start).catch(start);
+        else start();
       } catch (e) {}
     }
 
@@ -2314,7 +2349,17 @@
 
     function initScanner() {
       if (html5QrCodeScanner) return;
-      html5QrCodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
+      html5QrCodeScanner = new Html5QrcodeScanner("qr-reader", {
+        fps: 10,
+        qrbox: 250,
+        // Without this, the library just grabs whichever camera the device happens to
+        // enumerate first -- on many phones that's the front/selfie camera, which is
+        // useless for scanning a QR code someone else is holding up. This forces the
+        // rear camera. rememberLastUsedCamera also skips the picker on repeat visits
+        // once a working camera has been chosen once.
+        videoConstraints: { facingMode: { ideal: 'environment' } },
+        rememberLastUsedCamera: true,
+      });
       html5QrCodeScanner.render((tokenStr) => {
         processTokenCheck(tokenStr);
       }, (err) => {});
