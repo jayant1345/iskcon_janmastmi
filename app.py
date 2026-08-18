@@ -10,6 +10,7 @@ from functools import wraps
 import os
 import re
 import secrets
+import time
 import pymysql
 import pymysql.cursors
 from datetime import datetime, timedelta
@@ -40,6 +41,11 @@ PAYMENT_LINK_ENABLED = razorpay_client is not None and ONLINE_PAYMENT_MODE == 'p
 # -- never trust an amount for these from the client, only which ones were selected.
 SEVA_AARTI_PRICE = 500
 SEVA_ABHISHEK_TIERS = {'abhishek': 1100, 'silver_kalash': 2500, 'golden_kalash': 5001}
+
+# Volunteer-assisted Razorpay QR: how long the customer has to scan-and-pay before the
+# link expires and the volunteer's app stops waiting. Enforced both on Razorpay's side
+# (expire_by) and the frontend's poll timeout, from this single source of truth.
+VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS = 180
 
 def parse_seva_selection(data):
     """Server-side source of truth for what a public registrant selected -- only the
@@ -556,7 +562,11 @@ def get_settings_row():
 @login_required
 def get_settings():
     try:
-        return jsonify(get_settings_row())
+        settings = get_settings_row()
+        # Tells the volunteer app whether to offer the "Pay via Razorpay" QR option --
+        # independent of ONLINE_PAYMENT_MODE, which only governs the public /register flow.
+        settings['razorpay_configured'] = razorpay_client is not None
+        return jsonify(settings)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -838,7 +848,7 @@ def _create_registration(data, registered_by, category):
     free_entry = bool(data.get('free_entry', False))
     payment_mode = str(data.get('payment_mode', 'cash')).strip().lower()
     payment_ref  = str(data.get('payment_ref', '') or '').strip()[:64] or None
-    allowed_modes = ('cash', 'upi', 'free') if category == 'volunteer' else ('razorpay', 'pending', 'free')
+    allowed_modes = ('cash', 'upi', 'razorpay', 'free') if category == 'volunteer' else ('razorpay', 'pending', 'free')
     if payment_mode not in allowed_modes:
         payment_mode = allowed_modes[0]
 
@@ -1119,6 +1129,134 @@ def register_public_payment_link_complete():
         'donation_amount': 0,
     }
     return _create_registration(reg_data, registered_by=None, category='online')
+
+@app.route('/api/razorpay/volunteer-payment-link', methods=['POST'])
+@login_required
+def create_volunteer_razorpay_link():
+    """Logged-in volunteer flow -- creates a Razorpay Payment Link for an in-person
+    registration and returns its short_url so the volunteer's app can render it as a QR
+    code for the customer to scan with their own phone (instead of Checkout/redirect).
+    No callback_url is set -- nothing needs to redirect anywhere; the volunteer's device
+    polls /volunteer-payment-link/<id>/status instead."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not available right now'}), 503
+
+    data = request.get_json() or {}
+    name = str(data.get('name', '')).strip()
+    mobile = str(data.get('mobile', '')).strip()
+    address = str(data.get('address', '')).strip()
+    try:
+        persons = int(data.get('persons', 1))
+        aarti_amount = max(0, int(data.get('aarti_amount', 0) or 0))
+        abhishek_amount = max(0, int(data.get('abhishek_amount', 0) or 0))
+        donation_amount = max(0, int(data.get('donation_amount', 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid numeric field'}), 400
+
+    if not name or not address or not mobile:
+        return jsonify({'error': 'Name, address, and mobile number are required'}), 400
+    if not re.match(r'^\d{10}$', mobile):
+        return jsonify({'error': 'Mobile number must be 10 digits'}), 400
+    if persons < 1 or persons > 50:
+        return jsonify({'error': 'Members count must be between 1 and 50'}), 400
+
+    rate = get_settings_row()['token_rate']
+    token_amount = persons * rate
+    amount_paise = (token_amount + aarti_amount + abhishek_amount + donation_amount) * 100
+    if amount_paise <= 0:
+        return jsonify({'error': 'Nothing to pay'}), 400
+
+    reference_id = secrets.token_hex(12)
+    try:
+        link = razorpay_client.payment_link.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'accept_partial': False,
+            'description': f'ISKCON Janmashtami 2026 Entry Token ({persons} member{"s" if persons > 1 else ""})',
+            'customer': {'name': name[:100], 'contact': mobile},
+            'notify': {'sms': False, 'email': False},
+            'reminder_enable': False,
+            'reference_id': reference_id,
+            'expire_by': int(time.time()) + VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS,
+            'notes': {
+                'event': 'ISKCON Janmashtami 2026 Volunteer-Assisted Registration',
+                'name': name[:255],
+                'mobile': mobile[:15],
+                'address': address[:500],
+                'persons': persons,
+                'aarti_amount': aarti_amount,
+                'abhishek_amount': abhishek_amount,
+                'donation_amount': donation_amount,
+                'registered_by': session['user_id'],
+            },
+        })
+        return jsonify({
+            'link_id': link['id'],
+            'short_url': link['short_url'],
+            'amount': amount_paise // 100,
+            'expires_in': VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS,
+        })
+    except Exception as e:
+        log.error(f'razorpay volunteer payment_link create error: {e}')
+        return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
+@app.route('/api/razorpay/volunteer-payment-link/<link_id>/status', methods=['GET'])
+@login_required
+def volunteer_razorpay_link_status(link_id):
+    """Polled by the volunteer's app after showing the Razorpay QR. Pulls status straight
+    from Razorpay's API using our own secret-keyed client -- never trusts anything the
+    browser reports -- so this is authoritative the moment Razorpay shows the link paid."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not available right now'}), 503
+
+    try:
+        link = razorpay_client.payment_link.fetch(link_id)
+    except Exception as e:
+        log.error(f'razorpay volunteer payment_link fetch error: {e}')
+        return jsonify({'error': 'Could not check payment status. Please try again.'}), 500
+
+    if link.get('status') != 'paid':
+        return jsonify({'status': link.get('status', 'created')})
+
+    payments = link.get('payments') or []
+    captured = next((p for p in payments if p.get('status') == 'captured'), None) or (payments[-1] if payments else None)
+    payment_id = (captured or {}).get('payment_id') or (captured or {}).get('id')
+    if not payment_id:
+        return jsonify({'error': 'Payment marked paid but no payment record found. Please contact support.'}), 500
+
+    # Idempotent: a previous poll tick (or a slow double-request) may have already
+    # created the registration for this exact payment -- don't create a second one.
+    existing = db_query("SELECT * FROM registrations WHERE payment_ref=%s", (payment_id,), fetch='one')
+    if existing:
+        return jsonify({
+            'success': True, 'token': existing['token'], 'name': existing['name'],
+            'mobile': existing['mobile'], 'address': existing['address'],
+            'persons': existing['persons'], 'paid': existing['paid'],
+            'token_amount': existing['token_amount'], 'aarti_amount': existing['aarti_amount'],
+            'abhishek_amount': existing['abhishek_amount'], 'donation_amount': existing['donation_amount'],
+            'free_entry': bool(existing['free_entry']), 'payment_mode': existing['payment_mode'],
+            'category': existing['category'],
+        }), 200
+
+    if link.get('amount_paid') != link.get('amount'):
+        log.error(f'Razorpay volunteer link amount mismatch: {link}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
+    notes = link.get('notes') or {}
+    reg_data = {
+        'name': notes.get('name', ''),
+        'mobile': notes.get('mobile', ''),
+        'address': notes.get('address', ''),
+        'persons': notes.get('persons', 1),
+        'free_entry': False,
+        'payment_mode': 'razorpay',
+        'payment_ref': payment_id,
+        'aarti_amount': int(notes.get('aarti_amount', 0) or 0),
+        'abhishek_amount': int(notes.get('abhishek_amount', 0) or 0),
+        'donation_amount': int(notes.get('donation_amount', 0) or 0),
+    }
+    registered_by = notes.get('registered_by') or session['user_id']
+    return _create_registration(reg_data, registered_by=registered_by, category='volunteer')
 
 @app.route('/api/register/public', methods=['POST'])
 def register_public():
