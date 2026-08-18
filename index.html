@@ -676,6 +676,16 @@
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     }
 
+    /* Visible "still working, don't close this" pulse while waiting on Razorpay --
+       reassures the volunteer during a slow request instead of the screen looking frozen. */
+    @keyframes rzp-pulse-glow {
+      0%, 100% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(0, 229, 255, 0.5); }
+      50% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 0 10px rgba(0, 229, 255, 0); }
+    }
+    .qr-container.rzp-waiting {
+      animation: rzp-pulse-glow 1.6s ease-out infinite;
+    }
+
     /* LOGIN SCREEN SPECIFIC */
     .login-container {
       max-width: 420px;
@@ -1243,7 +1253,7 @@
           <i class="fa-solid fa-qrcode"></i> Generate Razorpay QR
         </button>
         <div id="payment-razorpay-qr-wrap" class="hidden" style="text-align: center;">
-          <div class="qr-container">
+          <div class="qr-container" id="payment-razorpay-qr-container">
             <div id="payment-razorpay-qrcode"></div>
           </div>
           <p id="payment-razorpay-status" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">
@@ -1269,7 +1279,7 @@
         <button id="payment-upi-confirm-btn" class="btn-primary" style="background: #25D366; color: white;" onclick="finalizeRegistration('upi')">
           <i class="fa-solid fa-circle-check"></i> Payment Received via UPI
         </button>
-        <button class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white;" onclick="finalizeRegistration('cash')">
+        <button id="payment-cash-btn" class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white;" onclick="finalizeRegistration('cash')">
           <i class="fa-solid fa-money-bill-wave"></i> Cash Received
         </button>
         <button class="btn-primary" style="background: rgba(255, 255, 255, 0.1); color: white;" onclick="closePaymentModal()">
@@ -1789,10 +1799,9 @@
     let razorpayQrPollTimer = null;
     let razorpayQrPollStartedAt = null;
     let razorpayQrPollActive = false;
-    let razorpayQrWindowMs = 3 * 60 * 1000; // overwritten from the server's expires_in on generate
+    let razorpayQrWindowMs = 15 * 60 * 1000; // overwritten from the server's expires_in on generate
     const RAZORPAY_QR_POLL_INTERVAL_MS = 3000;
-    const RAZORPAY_QR_FETCH_TIMEOUT_MS = 8000;
-    const RAZORPAY_QR_GENERATE_TIMEOUT_MS = 15000; // well under the 30s "QR must appear fast" target
+    const RAZORPAY_QR_FETCH_TIMEOUT_MS = 8000; // status polling only -- generation itself waits as long as it takes
 
     async function fetchWithTimeout(url, options, timeoutMs) {
       const controller = new AbortController();
@@ -1804,14 +1813,27 @@
       }
     }
 
+    // While a Razorpay QR is being generated or is out waiting to be scanned, block the
+    // Cash/UPI confirm buttons -- otherwise a volunteer could tap "Cash Received" mid-flight
+    // and create a second, duplicate registration for the same family on top of the one
+    // Razorpay is about to confirm.
+    function setOtherPaymentButtonsDisabled(disabled) {
+      const upiBtn = document.getElementById('payment-upi-confirm-btn');
+      const cashBtn = document.getElementById('payment-cash-btn');
+      if (upiBtn) upiBtn.disabled = disabled;
+      if (cashBtn) cashBtn.disabled = disabled;
+    }
+
     function resetVolunteerRazorpaySection() {
       stopVolunteerRazorpayPolling();
       razorpayQrLinkId = null;
       document.getElementById('payment-razorpay-generate-btn').classList.remove('hidden');
       document.getElementById('payment-razorpay-qr-wrap').classList.add('hidden');
       document.getElementById('payment-razorpay-qrcode').innerHTML = '';
+      document.getElementById('payment-razorpay-qr-container').classList.remove('rzp-waiting');
       const status = document.getElementById('payment-razorpay-status');
       status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Waiting for payment&hellip;';
+      setOtherPaymentButtonsDisabled(false);
     }
 
     function stopVolunteerRazorpayPolling() {
@@ -1830,28 +1852,28 @@
       if (!pendingRegistration) return;
       const btn = document.getElementById('payment-razorpay-generate-btn');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating QR...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to Razorpay&hellip;';
+      setOtherPaymentButtonsDisabled(true);
       try {
-        const res = await fetchWithTimeout(
-          `${API_BASE}/api/razorpay/volunteer-payment-link`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(pendingRegistration),
-          },
-          RAZORPAY_QR_GENERATE_TIMEOUT_MS
-        );
+        // No artificial timeout/abort here -- always wait for Razorpay's actual reply,
+        // however long that takes on a slow connection, instead of giving up early.
+        const res = await fetch(`${API_BASE}/api/razorpay/volunteer-payment-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(pendingRegistration),
+        });
         const data = await res.json();
         if (!res.ok) {
           alert('Could not generate Razorpay QR: ' + (data.error || 'Please try again.'));
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Generate Razorpay QR';
+          setOtherPaymentButtonsDisabled(false);
           return;
         }
 
         razorpayQrLinkId = data.link_id;
-        razorpayQrWindowMs = (data.expires_in || 180) * 1000;
+        razorpayQrWindowMs = (data.expires_in || 900) * 1000;
         btn.classList.add('hidden');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Generate Razorpay QR';
@@ -1859,30 +1881,36 @@
         const qrContainer = document.getElementById('payment-razorpay-qrcode');
         qrContainer.innerHTML = '';
         new QRCode(qrContainer, { text: data.short_url, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
+        document.getElementById('payment-razorpay-qr-container').classList.add('rzp-waiting');
         document.getElementById('payment-razorpay-qr-wrap').classList.remove('hidden');
         document.getElementById('payment-razorpay-status').innerHTML =
           `<i class="fa-solid fa-spinner fa-spin"></i> Waiting for payment&hellip; (customer has ${Math.round(razorpayQrWindowMs / 60000)} min to pay)`;
+        // other payment buttons stay disabled while this QR is live -- resetVolunteerRazorpaySection() re-enables them
 
         razorpayQrPollStartedAt = Date.now();
         stopVolunteerRazorpayPolling();
         razorpayQrPollActive = true;
         pollVolunteerRazorpayStatus(); // check immediately -- don't wait a full interval for the first check
       } catch (err) {
-        alert(err && err.name === 'AbortError'
-          ? 'Generating the Razorpay QR is taking too long. Please check your connection and try again.'
-          : 'Could not reach the server. Please check your connection and try again.');
+        alert('Could not reach the server. Please check your connection and try again.');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Generate Razorpay QR';
+        setOtherPaymentButtonsDisabled(false);
       }
+    }
+
+    function markVolunteerRazorpayExpired() {
+      stopVolunteerRazorpayPolling();
+      document.getElementById('payment-razorpay-qr-container').classList.remove('rzp-waiting');
+      document.getElementById('payment-razorpay-status').innerHTML =
+        '<i class="fa-solid fa-triangle-exclamation"></i> QR expired without payment. Cancel and generate a new one.';
     }
 
     async function pollVolunteerRazorpayStatus() {
       if (!razorpayQrPollActive || !razorpayQrLinkId) return;
 
       if (Date.now() - razorpayQrPollStartedAt > razorpayQrWindowMs) {
-        stopVolunteerRazorpayPolling();
-        document.getElementById('payment-razorpay-status').innerHTML =
-          '<i class="fa-solid fa-triangle-exclamation"></i> QR expired without payment. Cancel and generate a new one.';
+        markVolunteerRazorpayExpired();
         return;
       }
 
@@ -1906,9 +1934,7 @@
           return;
         }
         if (data.status === 'expired' || data.status === 'cancelled') {
-          stopVolunteerRazorpayPolling();
-          document.getElementById('payment-razorpay-status').innerHTML =
-            '<i class="fa-solid fa-triangle-exclamation"></i> QR expired without payment. Cancel and generate a new one.';
+          markVolunteerRazorpayExpired();
           return;
         }
         // otherwise data.status is 'created'/etc -- keep polling silently
