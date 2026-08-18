@@ -37,11 +37,6 @@ ONLINE_PAYMENT_MODE = os.environ.get('ONLINE_PAYMENT_MODE', 'pending').strip().l
 RAZORPAY_ENABLED = razorpay_client is not None and ONLINE_PAYMENT_MODE == 'razorpay'
 PAYMENT_LINK_ENABLED = razorpay_client is not None and ONLINE_PAYMENT_MODE == 'payment_link'
 
-# Optional seva add-ons offered during public self-registration. Fixed server-side prices
-# -- never trust an amount for these from the client, only which ones were selected.
-SEVA_AARTI_PRICE = 500
-SEVA_ABHISHEK_TIERS = {'abhishek': 1100, 'silver_kalash': 2500, 'golden_kalash': 5001}
-
 # Volunteer-assisted Razorpay QR: how long the customer has to scan-and-pay before the
 # link expires and the volunteer's app stops waiting. Enforced both on Razorpay's side
 # (expire_by) and the frontend's poll timeout, from this single source of truth.
@@ -53,12 +48,13 @@ SEVA_ABHISHEK_TIERS = {'abhishek': 1100, 'silver_kalash': 2500, 'golden_kalash':
 VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS = 1200
 
 def parse_seva_selection(data):
-    """Server-side source of truth for what a public registrant selected -- only the
-    boolean/tier choice is read from the client, the rupee amounts always come from the
-    fixed dicts above."""
-    aarti_amount = SEVA_AARTI_PRICE if data.get('aarti') else 0
-    abhishek_tier = str(data.get('abhishek_tier', 'none') or 'none').strip().lower()
-    abhishek_amount = SEVA_ABHISHEK_TIERS.get(abhishek_tier, 0)
+    """Public self-registration now trusts client-declared seva amounts, same as the
+    volunteer flow already does -- safe because the amount used here is the exact amount
+    Razorpay must actually verify as paid before any registration is created (see
+    register_public / register_public_payment_link_complete), so there's no way to
+    under-pay relative to what gets recorded."""
+    aarti_amount = max(0, int(data.get('aarti_amount', 0) or 0))
+    abhishek_amount = max(0, int(data.get('abhishek_amount', 0) or 0))
     return aarti_amount, abhishek_amount
 
 # ── SECRET KEY & SESSION CONFIG ──
@@ -965,12 +961,15 @@ def register_public_config():
     since the payment page itself is hosted on Razorpay, not this domain), or
     the pay-later fallback ('pending')."""
     mode = 'razorpay' if RAZORPAY_ENABLED else ('payment_link' if PAYMENT_LINK_ENABLED else 'pending')
+    settings = get_settings_row()
     return jsonify({
         'mode': mode,
         'razorpay_enabled': RAZORPAY_ENABLED,
-        'token_rate': get_settings_row()['token_rate'],
-        'aarti_price': SEVA_AARTI_PRICE,
-        'abhishek_tiers': SEVA_ABHISHEK_TIERS,
+        'token_rate': settings['token_rate'],
+        # Same admin-configurable defaults the volunteer form uses via /api/settings --
+        # editable amounts, these are just the suggested starting values.
+        'aarti_price': settings['aarti_price'],
+        'abhishek_price': settings['abhishek_price'],
     })
 
 @app.route('/api/razorpay/order', methods=['POST'])
@@ -990,7 +989,8 @@ def create_razorpay_order():
 
     rate = get_settings_row()['token_rate']
     aarti_amount, abhishek_amount = parse_seva_selection(data)
-    amount_paise = (persons * rate + aarti_amount + abhishek_amount) * 100
+    donation_amount = max(0, int(data.get('donation_amount', 0) or 0))
+    amount_paise = (persons * rate + aarti_amount + abhishek_amount + donation_amount) * 100
     if amount_paise <= 0:
         return jsonify({'error': 'Nothing to pay'}), 400
 
@@ -1006,6 +1006,7 @@ def create_razorpay_order():
                 'persons': persons,
                 'aarti_amount': aarti_amount,
                 'abhishek_amount': abhishek_amount,
+                'donation_amount': donation_amount,
             },
         })
         return jsonify({'order_id': order['id'], 'amount': amount_paise, 'currency': 'INR', 'key_id': RAZORPAY_KEY_ID})
@@ -1040,7 +1041,8 @@ def create_razorpay_payment_link():
 
     rate = get_settings_row()['token_rate']
     aarti_amount, abhishek_amount = parse_seva_selection(data)
-    amount_paise = (persons * rate + aarti_amount + abhishek_amount) * 100
+    donation_amount = max(0, int(data.get('donation_amount', 0) or 0))
+    amount_paise = (persons * rate + aarti_amount + abhishek_amount + donation_amount) * 100
     if amount_paise <= 0:
         return jsonify({'error': 'Nothing to pay'}), 400
 
@@ -1049,6 +1051,8 @@ def create_razorpay_payment_link():
         seva_bits.append('Aarti Seva')
     if abhishek_amount:
         seva_bits.append({1100: 'Abhishek Seva', 2500: 'Silver Kalash Abhishek Seva', 5001: 'Golden Kalash Abhishek Seva'}.get(abhishek_amount, 'Abhishek Seva'))
+    if donation_amount:
+        seva_bits.append('Donation')
     description = f'ISKCON Janmashtami 2026 Entry Token ({persons} member{"s" if persons > 1 else ""})'
     if seva_bits:
         description += ' + ' + ' + '.join(seva_bits)
@@ -1076,6 +1080,7 @@ def create_razorpay_payment_link():
                 'persons': persons,
                 'aarti_amount': aarti_amount,
                 'abhishek_amount': abhishek_amount,
+                'donation_amount': donation_amount,
             },
         })
         return jsonify({'short_url': link['short_url'], 'id': link['id'], 'amount': amount_paise // 100, 'persons': persons})
@@ -1154,7 +1159,7 @@ def register_public_payment_link_complete():
         'payment_ref': payment_id,
         'aarti_amount': int(notes.get('aarti_amount', 0) or 0),
         'abhishek_amount': int(notes.get('abhishek_amount', 0) or 0),
-        'donation_amount': 0,
+        'donation_amount': int(notes.get('donation_amount', 0) or 0),
     }
     return _create_registration(reg_data, registered_by=None, category='online')
 
@@ -1304,7 +1309,7 @@ def register_public():
         data['payment_mode'] = 'pending'
         data['aarti_amount'] = aarti_amount
         data['abhishek_amount'] = abhishek_amount
-        data['donation_amount'] = 0
+        data['donation_amount'] = max(0, int(data.get('donation_amount', 0) or 0))
         return _create_registration(data, registered_by=None, category='online')
 
     order_id   = str(data.get('razorpay_order_id', '')).strip()
@@ -1336,8 +1341,9 @@ def register_public():
     order_notes = order.get('notes') or {}
     aarti_amount = int(order_notes.get('aarti_amount', 0) or 0)
     abhishek_amount = int(order_notes.get('abhishek_amount', 0) or 0)
+    donation_amount = int(order_notes.get('donation_amount', 0) or 0)
     rate = get_settings_row()['token_rate']
-    expected_amount = (max(1, min(50, persons)) * rate + aarti_amount + abhishek_amount) * 100
+    expected_amount = (max(1, min(50, persons)) * rate + aarti_amount + abhishek_amount + donation_amount) * 100
 
     # The amount actually captured by Razorpay is the source of truth -- never trust
     # persons/amount fields from the request body for what gets charged.
@@ -1351,7 +1357,7 @@ def register_public():
     data['payment_ref'] = payment_id
     data['aarti_amount'] = aarti_amount
     data['abhishek_amount'] = abhishek_amount
-    data['donation_amount'] = 0
+    data['donation_amount'] = donation_amount
     return _create_registration(data, registered_by=None, category='online')
 
 # ============================================================
