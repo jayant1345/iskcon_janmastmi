@@ -934,20 +934,28 @@
                 <div id="reg-token-amount-display" style="padding: 0.7rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; font-weight: 700; color: var(--accent-gold-light);">₹0</div>
               </div>
 
-              <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; margin-top: 0.75rem;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
-                  <input type="checkbox" id="reg-aarti" onchange="toggleFacilityAmount('aarti')">
-                  <span style="font-weight: 600; font-size: 0.85rem;">Aarti Seva</span>
+              <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="form-label">Optional Sevas</label>
+                <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 0.9rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer; margin-bottom: 0.55rem;">
+                  <input type="checkbox" id="reg-aarti" onchange="updateBookingTotal()">
+                  <span style="flex: 1; font-weight: 600; font-size: 0.85rem;">Aarti Seva with family</span>
+                  <span id="reg-aarti-price" style="font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem;">₹500</span>
                 </label>
-                <input type="number" id="reg-aarti-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateBookingTotal()">
-              </div>
-
-              <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; margin-top: 0.5rem;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
-                  <input type="checkbox" id="reg-abhishek" onchange="toggleFacilityAmount('abhishek')">
-                  <span style="font-weight: 600; font-size: 0.85rem;">Abhishek Seva</span>
+                <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 0.9rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer; margin-bottom: 0.55rem;">
+                  <input type="checkbox" class="abhishek-tier" value="abhishek" onchange="onAbhishekTierChange(this)">
+                  <span style="flex: 1; font-weight: 600; font-size: 0.85rem;">Abhishek Seva with family</span>
+                  <span class="abhishek-tier-price" style="font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem;">₹1100</span>
                 </label>
-                <input type="number" id="reg-abhishek-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateBookingTotal()">
+                <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 0.9rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer; margin-bottom: 0.55rem;">
+                  <input type="checkbox" class="abhishek-tier" value="silver_kalash" onchange="onAbhishekTierChange(this)">
+                  <span style="flex: 1; font-weight: 600; font-size: 0.85rem;">Silver Kalash Abhishek Seva with family</span>
+                  <span class="abhishek-tier-price" style="font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem;">₹2500</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 0.9rem; background: rgba(15, 23, 42, 0.6); border-radius: 10px; cursor: pointer;">
+                  <input type="checkbox" class="abhishek-tier" value="golden_kalash" onchange="onAbhishekTierChange(this)">
+                  <span style="flex: 1; font-weight: 600; font-size: 0.85rem;">Golden Kalash Abhishek Seva with family</span>
+                  <span class="abhishek-tier-price" style="font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem;">₹5001</span>
+                </label>
               </div>
 
               <div class="form-group" style="margin-top: 0.75rem;">
@@ -1671,6 +1679,11 @@
 
     // ── REGISTER FAMILY / PRICING ──
     let pricingSettings = { token_rate: 20, aarti_price: 101, abhishek_price: 251 };
+    // Seva tier prices -- same fixed values the public /register page uses (SEVA_AARTI_PRICE /
+    // SEVA_ABHISHEK_TIERS in app.py, served via /api/register/public/config), so both
+    // registration paths always show identical seva pricing.
+    let SEVA_AARTI_PRICE = 500;
+    let SEVA_ABHISHEK_TIERS = { abhishek: 1100, silver_kalash: 2500, golden_kalash: 5001 };
 
     async function loadPricingSettings() {
       try {
@@ -1679,8 +1692,22 @@
       } catch (err) {
         console.error('Failed to load pricing settings:', err);
       }
+      try {
+        const res = await fetch(`${API_BASE}/api/register/public/config`);
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.aarti_price) SEVA_AARTI_PRICE = cfg.aarti_price;
+          if (cfg.abhishek_tiers) SEVA_ABHISHEK_TIERS = cfg.abhishek_tiers;
+        }
+      } catch (err) {
+        console.error('Failed to load seva pricing:', err);
+      }
       const hint = document.getElementById('reg-rate-hint');
       if (hint) hint.textContent = `(₹${pricingSettings.token_rate}/person)`;
+      document.getElementById('reg-aarti-price').textContent = `₹${SEVA_AARTI_PRICE}`;
+      document.querySelectorAll('.abhishek-tier').forEach(cb => {
+        cb.closest('label').querySelector('.abhishek-tier-price').textContent = `₹${SEVA_ABHISHEK_TIERS[cb.value] || ''}`;
+      });
       updateBookingTotal();
     }
 
@@ -1691,27 +1718,26 @@
       updateBookingTotal();
     }
 
-    function toggleFacilityAmount(type) {
-      const checkbox = document.getElementById(`reg-${type}`);
-      const amountInput = document.getElementById(`reg-${type}-amount`);
-      if (checkbox.checked) {
-        amountInput.disabled = false;
-        if (parseInt(amountInput.value || 0) <= 0) {
-          amountInput.value = pricingSettings[`${type}_price`] || 0;
-        }
-      } else {
-        amountInput.disabled = true;
-        amountInput.value = 0;
+    function onAbhishekTierChange(cb) {
+      if (cb.checked) {
+        document.querySelectorAll('.abhishek-tier').forEach(other => {
+          if (other !== cb) other.checked = false;
+        });
       }
       updateBookingTotal();
+    }
+
+    function getSelectedAbhishekTier() {
+      const checked = document.querySelector('.abhishek-tier:checked');
+      return checked ? checked.value : 'none';
     }
 
     function updateBookingTotal() {
       const persons = parseInt(document.getElementById('reg-persons').value || 1);
       const freeEntry = document.getElementById('reg-free-entry').checked;
       const tokenAmount = freeEntry ? 0 : persons * pricingSettings.token_rate;
-      const aartiAmount = document.getElementById('reg-aarti').checked ? parseInt(document.getElementById('reg-aarti-amount').value || 0) : 0;
-      const abhishekAmount = document.getElementById('reg-abhishek').checked ? parseInt(document.getElementById('reg-abhishek-amount').value || 0) : 0;
+      const aartiAmount = document.getElementById('reg-aarti').checked ? SEVA_AARTI_PRICE : 0;
+      const abhishekAmount = SEVA_ABHISHEK_TIERS[getSelectedAbhishekTier()] || 0;
       const donationAmount = parseInt(document.getElementById('reg-donation-amount').value || 0);
       const total = tokenAmount + aartiAmount + abhishekAmount + donationAmount;
 
@@ -1735,8 +1761,6 @@
     function resetRegistrationForm() {
       document.getElementById('register-form').reset();
       document.getElementById('reg-persons').value = 1;
-      document.getElementById('reg-aarti-amount').disabled = true;
-      document.getElementById('reg-abhishek-amount').disabled = true;
       updateBookingTotal();
     }
 

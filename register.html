@@ -85,6 +85,14 @@
       background: rgba(0, 229, 255, 0.1); color: var(--accent-peacock); font-size: 1.3rem; font-weight: 700; cursor: pointer;
     }
     .counter-btn:hover { background: var(--accent-peacock); color: #030D22; }
+    .seva-option {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.7rem 0.9rem; border: 1px solid var(--border-peacock); border-radius: 12px;
+      background: rgba(3, 13, 34, 0.55); margin-bottom: 0.55rem; cursor: pointer;
+    }
+    .seva-option input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-peacock); flex-shrink: 0; }
+    .seva-option .seva-label { flex: 1; font-size: 0.85rem; }
+    .seva-option .seva-price { font-weight: 700; color: var(--accent-gold-light); font-size: 0.85rem; white-space: nowrap; }
     .total-box {
       background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-peacock); border-radius: 12px;
       padding: 0.85rem 1.1rem; margin: 0.25rem 0 1.1rem; display: flex; justify-content: space-between; align-items: center;
@@ -177,35 +185,27 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Token / Entry Charge</label>
-        <div class="total-box" style="margin: 0;">
-          <span class="total-label">Entry Token</span>
-          <span class="total-amount" id="token-amount-display" style="font-size: 1.1rem;">₹50</span>
-        </div>
-      </div>
-
-      <div class="form-group">
         <label class="form-label">Optional Sevas</label>
-        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; margin-bottom: 0.6rem;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
-            <input type="checkbox" id="seva-aarti" onchange="toggleSevaAmount('aarti')">
-            <span style="font-weight: 600; font-size: 0.85rem;">Aarti Seva</span>
-          </label>
-          <input type="number" id="seva-aarti-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateTotalAmount()">
-        </div>
-        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; white-space: nowrap;">
-            <input type="checkbox" id="seva-abhishek" onchange="toggleSevaAmount('abhishek')">
-            <span style="font-weight: 600; font-size: 0.85rem;">Abhishek Seva</span>
-          </label>
-          <input type="number" id="seva-abhishek-amount" class="form-control" value="0" min="0" placeholder="Amount" disabled oninput="updateTotalAmount()">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Donation (₹) &mdash; 80G Receipt Issued Later</label>
-        <input type="number" id="reg-donation-amount" class="form-control" value="0" min="0" placeholder="0" oninput="updateTotalAmount()">
-        <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.3rem;">Optional. Donor receives an 80G tax exemption receipt separately.</p>
+        <label class="seva-option">
+          <input type="checkbox" id="seva-aarti" onchange="updateTotalAmount()">
+          <span class="seva-label">Aarti Seva with family</span>
+          <span class="seva-price">₹500</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="abhishek" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Abhishek Seva with family</span>
+          <span class="seva-price">₹1100</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="silver_kalash" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Silver Kalash Abhishek Seva with family</span>
+          <span class="seva-price">₹2500</span>
+        </label>
+        <label class="seva-option">
+          <input type="checkbox" class="abhishek-tier" value="golden_kalash" onchange="onAbhishekTierChange(this)">
+          <span class="seva-label">Golden Kalash Abhishek Seva with family</span>
+          <span class="seva-price">₹5001</span>
+        </label>
       </div>
 
       <div class="total-box">
@@ -263,40 +263,32 @@
     }
 
     // ── Optional seva pricing (loaded from server config so it can never drift
-    // from what actually gets charged -- see loadPaymentMode()) -- these are just
-    // suggested defaults now; the amount fields are freely editable, matching the
-    // volunteer-assisted registration form. ──
+    // from what actually gets charged -- see loadPaymentMode()) ──
     let PRICE_RATE = 50;
     let PRICE_AARTI = 500;
-    let PRICE_ABHISHEK = 1100;
+    let PRICE_ABHISHEK_TIERS = { abhishek: 1100, silver_kalash: 2500, golden_kalash: 5001 };
 
-    function toggleSevaAmount(type) {
-      const checkbox = document.getElementById(`seva-${type}`);
-      const amountInput = document.getElementById(`seva-${type}-amount`);
-      if (checkbox.checked) {
-        amountInput.disabled = false;
-        if (parseInt(amountInput.value || 0, 10) <= 0) {
-          amountInput.value = type === 'aarti' ? PRICE_AARTI : PRICE_ABHISHEK;
-        }
-      } else {
-        amountInput.disabled = true;
-        amountInput.value = 0;
+    function onAbhishekTierChange(cb) {
+      if (cb.checked) {
+        document.querySelectorAll('.abhishek-tier').forEach(other => {
+          if (other !== cb) other.checked = false;
+        });
       }
       updateTotalAmount();
     }
 
+    function getSelectedAbhishekTier() {
+      const checked = document.querySelector('.abhishek-tier:checked');
+      return checked ? checked.value : 'none';
+    }
+
     function updateTotalAmount() {
       const persons = parseInt(document.getElementById('reg-persons').value, 10) || 1;
-      const tokenAmount = persons * PRICE_RATE;
-      const aartiAmount = document.getElementById('seva-aarti').checked
-        ? (parseInt(document.getElementById('seva-aarti-amount').value, 10) || 0) : 0;
-      const abhishekAmount = document.getElementById('seva-abhishek').checked
-        ? (parseInt(document.getElementById('seva-abhishek-amount').value, 10) || 0) : 0;
-      const donationAmount = parseInt(document.getElementById('reg-donation-amount').value, 10) || 0;
-      const total = tokenAmount + aartiAmount + abhishekAmount + donationAmount;
-      document.getElementById('token-amount-display').textContent = `₹${tokenAmount}`;
+      let total = persons * PRICE_RATE;
+      if (document.getElementById('seva-aarti').checked) total += PRICE_AARTI;
+      const tier = getSelectedAbhishekTier();
+      if (tier !== 'none') total += (PRICE_ABHISHEK_TIERS[tier] || 0);
       document.getElementById('total-amount-display').textContent = `₹${total}`;
-      return { tokenAmount, aartiAmount, abhishekAmount, donationAmount, total };
     }
 
     function showError(msg) {
@@ -311,10 +303,6 @@
     function registerAnother() {
       document.getElementById('public-register-form').reset();
       document.getElementById('reg-persons').value = 1;
-      // form.reset() restores values/checked state but not the disabled property we set
-      // via JS -- re-disable the amount fields so a re-check is needed to edit them again.
-      document.getElementById('seva-aarti-amount').disabled = true;
-      document.getElementById('seva-abhishek-amount').disabled = true;
       document.getElementById('success-card').classList.add('hidden');
       document.getElementById('form-card').classList.remove('hidden');
       currentPassData = null;
@@ -356,10 +344,12 @@
         paymentMode = data.mode || 'pending';
         if (data.token_rate) PRICE_RATE = data.token_rate;
         if (data.aarti_price) PRICE_AARTI = data.aarti_price;
-        if (data.abhishek_price) PRICE_ABHISHEK = data.abhishek_price;
+        if (data.abhishek_tiers) PRICE_ABHISHEK_TIERS = data.abhishek_tiers;
         document.querySelector('#pricing-note strong').textContent = `₹${PRICE_RATE} per person`;
-        document.getElementById('seva-aarti-amount').placeholder = `e.g. ${PRICE_AARTI}`;
-        document.getElementById('seva-abhishek-amount').placeholder = `e.g. ${PRICE_ABHISHEK}`;
+        document.querySelectorAll('.seva-option')[0].querySelector('.seva-price').textContent = `₹${PRICE_AARTI}`;
+        document.querySelectorAll('.abhishek-tier').forEach(cb => {
+          cb.closest('.seva-option').querySelector('.seva-price').textContent = `₹${PRICE_ABHISHEK_TIERS[cb.value] || ''}`;
+        });
         updateTotalAmount();
       } catch (err) {
         paymentMode = 'pending'; // if we can't tell, don't block registration on payment
@@ -850,9 +840,8 @@
         order_id: order.order_id,
         name: 'ISKCON Janmashtami 2026',
         description: `Entry token — ${payload.persons} family member${payload.persons > 1 ? 's' : ''}`
-          + (payload.aarti_amount > 0 ? ' + Aarti Seva' : '')
-          + (payload.abhishek_amount > 0 ? ` + ${abhishekLabel(payload.abhishek_amount)}` : '')
-          + (payload.donation_amount > 0 ? ' + Donation' : ''),
+          + (payload.aarti ? ' + Aarti Seva' : '')
+          + (payload.abhishek_tier && payload.abhishek_tier !== 'none' ? ` + ${abhishekLabel(PRICE_ABHISHEK_TIERS[payload.abhishek_tier])}` : ''),
         image: 'iskcon_logo_icon.png',
         prefill: { name: payload.name, contact: payload.mobile },
         theme: { color: '#F59E0B' },
@@ -973,11 +962,8 @@
         mobile: document.getElementById('reg-mobile').value.trim(),
         address: document.getElementById('reg-address').value.trim(),
         persons: parseInt(document.getElementById('reg-persons').value, 10) || 1,
-        aarti_amount: document.getElementById('seva-aarti').checked
-          ? (parseInt(document.getElementById('seva-aarti-amount').value, 10) || 0) : 0,
-        abhishek_amount: document.getElementById('seva-abhishek').checked
-          ? (parseInt(document.getElementById('seva-abhishek-amount').value, 10) || 0) : 0,
-        donation_amount: parseInt(document.getElementById('reg-donation-amount').value, 10) || 0,
+        aarti: document.getElementById('seva-aarti').checked,
+        abhishek_tier: getSelectedAbhishekTier(),
       };
 
       const btn = document.getElementById('submit-btn');
