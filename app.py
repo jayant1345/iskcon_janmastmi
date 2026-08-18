@@ -45,10 +45,12 @@ SEVA_ABHISHEK_TIERS = {'abhishek': 1100, 'silver_kalash': 2500, 'golden_kalash':
 # Volunteer-assisted Razorpay QR: how long the customer has to scan-and-pay before the
 # link expires and the volunteer's app stops waiting. Enforced both on Razorpay's side
 # (expire_by) and the frontend's poll timeout, from this single source of truth.
-# 900s (15 min) is Razorpay's own minimum allowed expire_by window -- anything shorter
-# is rejected outright by their API ("timestamp must be atleast 15 minutes in future"),
-# which is why QR generation was failing every time before this was raised to 900.
-VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS = 900
+# Razorpay's own minimum allowed expire_by window is 900s (15 min) -- anything at or
+# even exactly on that boundary was still getting rejected ("timestamp must be atleast
+# 15 minutes in future"), almost certainly clock drift/latency between when we compute
+# the timestamp and when Razorpay validates it eating into the margin. 1200s (20 min)
+# gives a comfortable 5-minute buffer above their stated minimum.
+VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS = 1200
 
 def parse_seva_selection(data):
     """Server-side source of truth for what a public registrant selected -- only the
