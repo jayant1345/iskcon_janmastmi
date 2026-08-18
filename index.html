@@ -686,6 +686,20 @@
       animation: rzp-pulse-glow 1.6s ease-out infinite;
     }
 
+    /* Toggle switch for the personal-UPI QR (hidden by default, shown on demand) */
+    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: rgba(255, 255, 255, 0.15); border-radius: 24px; transition: 0.2s;
+    }
+    .toggle-slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--accent-peacock); }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+
     /* LOGIN SCREEN SPECIFIC */
     .login-container {
       max-width: 420px;
@@ -1273,7 +1287,15 @@
         </div>
       </div>
 
-      <div id="payment-upi-qr-section" style="margin-top: 1rem;">
+      <div id="payment-upi-toggle-row" class="hidden" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; padding: 0.5rem 0.1rem;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Show my personal UPI QR instead</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="payment-upi-toggle" onchange="togglePersonalUpiSection()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div id="payment-upi-qr-section" class="hidden" style="margin-top: 1rem;">
         <div class="qr-container">
           <div id="payment-upi-qrcode"></div>
         </div>
@@ -1284,7 +1306,7 @@
       </p>
 
       <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.25rem;">
-        <button id="payment-upi-confirm-btn" class="btn-primary" style="background: #25D366; color: white;" onclick="finalizeRegistration('upi')">
+        <button id="payment-upi-confirm-btn" class="btn-primary hidden" style="background: #25D366; color: white;" onclick="finalizeRegistration('upi')">
           <i class="fa-solid fa-circle-check"></i> Payment Received via UPI
         </button>
         <button id="payment-cash-btn" class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white;" onclick="finalizeRegistration('cash')">
@@ -1784,27 +1806,36 @@
       document.getElementById('payment-breakdown').textContent = breakdownLines.join(' · ');
 
       const upiId = currentUser && currentUser.upi_id;
-      const qrSection = document.getElementById('payment-upi-qr-section');
+      const toggleRow = document.getElementById('payment-upi-toggle-row');
+      const toggleInput = document.getElementById('payment-upi-toggle');
       const noUpiMsg = document.getElementById('payment-no-upi-msg');
       const qrContainer = document.getElementById('payment-upi-qrcode');
       qrContainer.innerHTML = '';
-      const upiConfirmBtn = document.getElementById('payment-upi-confirm-btn');
       if (upiId) {
-        qrSection.classList.remove('hidden');
+        toggleRow.classList.remove('hidden');
+        toggleInput.checked = false;
         noUpiMsg.classList.add('hidden');
-        upiConfirmBtn.classList.remove('hidden');
         const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(currentUser.name)}&am=${amounts.total}&cu=INR&tn=${encodeURIComponent('ISKCON Janmashtami - ' + form.name)}`;
         new QRCode(qrContainer, { text: upiUrl, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
       } else {
-        qrSection.classList.add('hidden');
+        toggleRow.classList.add('hidden');
         noUpiMsg.classList.remove('hidden');
-        upiConfirmBtn.classList.add('hidden');
       }
+      setPersonalUpiVisible(false); // always start hidden -- toggle switch (or a generated Razorpay QR) controls it from here
 
       document.getElementById('payment-razorpay-section').classList.toggle('hidden', !pricingSettings.razorpay_configured);
       resetVolunteerRazorpaySection();
 
       document.getElementById('payment-modal').classList.add('active');
+    }
+
+    function setPersonalUpiVisible(show) {
+      document.getElementById('payment-upi-qr-section').classList.toggle('hidden', !show);
+      document.getElementById('payment-upi-confirm-btn').classList.toggle('hidden', !show);
+    }
+
+    function togglePersonalUpiSection() {
+      setPersonalUpiVisible(document.getElementById('payment-upi-toggle').checked);
     }
 
     function closePaymentModal() {
@@ -1819,7 +1850,7 @@
     // in flight, piling up overlapping calls and making the network worse right when it's
     // already struggling. Each fetch also has its own timeout so one stalled request can't
     // stall the whole chain -- this keeps payment detection latency from ever creeping up.
-    let razorpayQrLinkId = null;
+    let razorpayQrId = null;
     let razorpayQrPollTimer = null;
     let razorpayQrPollStartedAt = null;
     let razorpayQrPollActive = false;
@@ -1850,7 +1881,7 @@
 
     function resetVolunteerRazorpaySection() {
       stopVolunteerRazorpayPolling();
-      razorpayQrLinkId = null;
+      razorpayQrId = null;
       document.getElementById('payment-razorpay-generate-btn').classList.remove('hidden');
       document.getElementById('payment-razorpay-qr-wrap').classList.add('hidden');
       document.getElementById('payment-razorpay-qrcode').innerHTML = '';
@@ -1881,7 +1912,7 @@
       try {
         // No artificial timeout/abort here -- always wait for Razorpay's actual reply,
         // however long that takes on a slow connection, instead of giving up early.
-        const res = await fetch(`${API_BASE}/api/razorpay/volunteer-payment-link`, {
+        const res = await fetch(`${API_BASE}/api/razorpay/volunteer-qr`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1896,15 +1927,22 @@
           return;
         }
 
-        razorpayQrLinkId = data.link_id;
+        razorpayQrId = data.qr_id;
         razorpayQrWindowMs = (data.expires_in || 900) * 1000;
         btn.classList.add('hidden');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Generate Razorpay QR';
 
+        // Only one QR should ever be in front of the customer at a time -- if the
+        // volunteer had toggled their personal-UPI QR on, hide it now that a real
+        // Razorpay QR is live.
+        document.getElementById('payment-upi-toggle').checked = false;
+        setPersonalUpiVisible(false);
+
+        // Razorpay's QR Code API returns a ready-made image of the actual UPI-intent QR --
+        // display it directly instead of re-encoding a URL into our own client-side QR.
         const qrContainer = document.getElementById('payment-razorpay-qrcode');
-        qrContainer.innerHTML = '';
-        new QRCode(qrContainer, { text: data.short_url, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
+        qrContainer.innerHTML = `<img src="${data.image_url}" alt="Razorpay UPI QR" style="width:180px; height:180px; display:block;">`;
         document.getElementById('payment-razorpay-qr-container').classList.add('rzp-waiting');
         document.getElementById('payment-razorpay-qr-wrap').classList.remove('hidden');
         document.getElementById('payment-razorpay-status').innerHTML =
@@ -1931,7 +1969,7 @@
     }
 
     async function pollVolunteerRazorpayStatus() {
-      if (!razorpayQrPollActive || !razorpayQrLinkId) return;
+      if (!razorpayQrPollActive || !razorpayQrId) return;
 
       if (Date.now() - razorpayQrPollStartedAt > razorpayQrWindowMs) {
         markVolunteerRazorpayExpired();
@@ -1940,7 +1978,7 @@
 
       try {
         const res = await fetchWithTimeout(
-          `${API_BASE}/api/razorpay/volunteer-payment-link/${razorpayQrLinkId}/status`,
+          `${API_BASE}/api/razorpay/volunteer-qr/${razorpayQrId}/status`,
           { credentials: 'include' },
           RAZORPAY_QR_FETCH_TIMEOUT_MS
         );
