@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import time
+import traceback
 import pymysql
 import pymysql.cursors
 from datetime import datetime, timedelta
@@ -1271,21 +1272,32 @@ def volunteer_razorpay_qr_status(qr_id):
             'category': existing['category'],
         }), 200
 
-    notes = qr.get('notes') or {}
-    reg_data = {
-        'name': notes.get('name', ''),
-        'mobile': notes.get('mobile', ''),
-        'address': notes.get('address', ''),
-        'persons': notes.get('persons', 1),
-        'free_entry': False,
-        'payment_mode': 'razorpay',
-        'payment_ref': payment_id,
-        'aarti_amount': int(notes.get('aarti_amount', 0) or 0),
-        'abhishek_amount': int(notes.get('abhishek_amount', 0) or 0),
-        'donation_amount': int(notes.get('donation_amount', 0) or 0),
-    }
-    registered_by = notes.get('registered_by') or session['user_id']
-    return _create_registration(reg_data, registered_by=registered_by, category='volunteer')
+    try:
+        notes = qr.get('notes') or {}
+        reg_data = {
+            'name': notes.get('name', ''),
+            'mobile': notes.get('mobile', ''),
+            'address': notes.get('address', ''),
+            'persons': int(notes.get('persons', 1) or 1),
+            'free_entry': False,
+            'payment_mode': 'razorpay',
+            'payment_ref': payment_id,
+            'aarti_amount': int(notes.get('aarti_amount', 0) or 0),
+            'abhishek_amount': int(notes.get('abhishek_amount', 0) or 0),
+            'donation_amount': int(notes.get('donation_amount', 0) or 0),
+        }
+        registered_by = notes.get('registered_by') or session['user_id']
+        try:
+            registered_by = int(registered_by)
+        except (TypeError, ValueError):
+            registered_by = session['user_id']
+        return _create_registration(reg_data, registered_by=registered_by, category='volunteer')
+    except Exception:
+        # Payment is already confirmed at this point -- log the full traceback so the
+        # real cause is visible (this branch was returning a bare 500 with no diagnostics
+        # before), but don't lose the customer's money without a paper trail.
+        log.error(f'volunteer_razorpay_qr_status: registration creation failed for payment {payment_id}, qr {qr_id}:\n{traceback.format_exc()}')
+        return jsonify({'error': f'Payment succeeded but registration failed. Payment ID: {payment_id} -- please contact support with this ID.'}), 500
 
 @app.route('/api/register/public', methods=['POST'])
 def register_public():
