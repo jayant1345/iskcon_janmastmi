@@ -1942,7 +1942,11 @@
         // Razorpay's QR Code API returns a ready-made image of the actual UPI-intent QR --
         // display it directly instead of re-encoding a URL into our own client-side QR.
         const qrContainer = document.getElementById('payment-razorpay-qrcode');
-        qrContainer.innerHTML = `<img src="${data.image_url}" alt="Razorpay UPI QR" style="width:180px; height:180px; display:block;">`;
+        // Razorpay's image_url is a full branded card (logo, UPI/app badges, business
+        // name) -- taller than wide, not a plain square QR. Forcing a fixed square box
+        // stretched/distorted the QR pattern itself, breaking scannability. Cap the width
+        // and let height scale naturally to preserve the real aspect ratio.
+        qrContainer.innerHTML = `<img src="${data.image_url}" alt="Razorpay UPI QR" style="max-width: 220px; width: 100%; height: auto; display: block;">`;
         document.getElementById('payment-razorpay-qr-container').classList.add('rzp-waiting');
         document.getElementById('payment-razorpay-qr-wrap').classList.remove('hidden');
         document.getElementById('payment-razorpay-status').innerHTML =
