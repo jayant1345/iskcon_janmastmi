@@ -176,6 +176,9 @@ def init_db():
             """)
 
             # ── TOKEN COUNTER ──
+            # Two independent series: id=1 is volunteer/one-on-one registrations (pass
+            # numbers start at 1000), id=2 is online self-registration via the public
+            # /register page -- e.g. Razorpay links shared on social media (starts at 5000).
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS token_counter (
                     id      INT PRIMARY KEY DEFAULT 1,
@@ -183,6 +186,11 @@ def init_db():
                 ) ENGINE=InnoDB
             """)
             cur.execute("INSERT IGNORE INTO token_counter (id, current) VALUES (1, 0)")
+            cur.execute("INSERT IGNORE INTO token_counter (id, current) VALUES (2, 0)")
+            # Bump each counter up to its series baseline once -- never backward, so this
+            # can't collide with tokens already issued under the old shared-counter scheme.
+            cur.execute("UPDATE token_counter SET current = 999 WHERE id = 1 AND current < 999")
+            cur.execute("UPDATE token_counter SET current = 4999 WHERE id = 2 AND current < 4999")
 
             # ── ATTENDANCE LOG (per-scan-event log for accurate hourly footfall) ──
             cur.execute("""
@@ -893,10 +901,13 @@ def _create_registration(data, registered_by, category):
         conn = get_db()
         try:
             with conn.cursor() as cur:
-                cur.execute("UPDATE token_counter SET current = current + 1 WHERE id = 1")
-                cur.execute("SELECT current FROM token_counter WHERE id = 1")
+                # id=1 -> volunteer/one-on-one series (1000+), id=2 -> online
+                # self-registration series (5000+) -- see the token_counter comment in init_db.
+                counter_id = 1 if category == 'volunteer' else 2
+                cur.execute("UPDATE token_counter SET current = current + 1 WHERE id = %s", (counter_id,))
+                cur.execute("SELECT current FROM token_counter WHERE id = %s", (counter_id,))
                 tok_num = cur.fetchone()['current']
-                token = str(tok_num).zfill(3)
+                token = str(tok_num)
 
                 cur.execute("""
                     INSERT INTO registrations
@@ -1641,7 +1652,8 @@ def clear_all():
     try:
         db_execute("DELETE FROM attendance")
         db_execute("DELETE FROM registrations")
-        db_execute("UPDATE token_counter SET current = 0 WHERE id = 1")
+        db_execute("UPDATE token_counter SET current = 999 WHERE id = 1")
+        db_execute("UPDATE token_counter SET current = 4999 WHERE id = 2")
         log.warning('ALL JANMASTHAMI DATA CLEARED BY ADMIN')
         return jsonify({'success': True, 'message': 'All registration & gate data reset successfully.'})
     except Exception as e:

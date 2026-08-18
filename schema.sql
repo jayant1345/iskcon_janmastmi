@@ -63,13 +63,17 @@ CREATE TABLE IF NOT EXISTS attendance (
 ) ENGINE=InnoDB CHARACTER SET utf8mb4;
 
 -- ── TOKEN COUNTER TABLE ──
+-- Two independent series: id=1 is volunteer/one-on-one registrations (pass numbers
+-- start at 1000), id=2 is online self-registration via the public /register page --
+-- e.g. Razorpay links shared on social media (starts at 5000).
 CREATE TABLE IF NOT EXISTS token_counter (
     id      INT PRIMARY KEY DEFAULT 1,
     current INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
--- Seed the initial counter row
-INSERT IGNORE INTO token_counter (id, current) VALUES (1, 0);
+-- Seed both counters at their baseline (first token issued will be baseline + 1)
+INSERT IGNORE INTO token_counter (id, current) VALUES (1, 999);
+INSERT IGNORE INTO token_counter (id, current) VALUES (2, 4999);
 
 -- ── ATTENDANCE LOG TABLE ── (per-scan-event log, used for accurate hourly footfall)
 CREATE TABLE IF NOT EXISTS attendance_log (
