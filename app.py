@@ -360,11 +360,14 @@ def admin_required(f):
 @app.route('/')
 @app.route('/index.html')
 def serve_frontend():
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+    # max_age=0 forces the browser to always revalidate with the server instead of
+    # serving a stale cached copy -- mobile browsers cache HTML shells more aggressively
+    # than desktop by default, which was masking freshly-deployed fixes on some phones.
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html', max_age=0)
 
 @app.route('/register')
 def serve_public_register():
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'register.html')
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'register.html', max_age=0)
 
 @app.route('/<path:filename>')
 def serve_static_file(filename):
@@ -397,7 +400,16 @@ def login():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
     user = db_query("SELECT * FROM users WHERE username = %s", (username,), fetch='one')
-    if not user or not check_password_hash(user['password_hash'], password):
+    if not user:
+        log.warning(f"Login failed: no user found for username '{username}'")
+        return jsonify({'error': 'Invalid username or password'}), 401
+    if not check_password_hash(user['password_hash'], password):
+        # Never log the password itself -- just enough shape info to tell whether a mobile
+        # keyboard is silently mangling it (stray whitespace, wrong length) vs. a genuine typo.
+        log.warning(
+            f"Login failed: wrong password for username '{username}' "
+            f"(len={len(password)}, has_edge_whitespace={password != password.strip()})"
+        )
         return jsonify({'error': 'Invalid username or password'}), 401
     
     session.clear()
