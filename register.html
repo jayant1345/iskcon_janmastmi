@@ -188,22 +188,22 @@
         <label class="form-label">Optional Sevas</label>
         <label class="seva-option">
           <input type="checkbox" id="seva-aarti" onchange="updateTotalAmount()">
-          <span class="seva-label">Aarti with family</span>
+          <span class="seva-label">Aarti Seva with family</span>
           <span class="seva-price">₹500</span>
         </label>
         <label class="seva-option">
           <input type="checkbox" class="abhishek-tier" value="abhishek" onchange="onAbhishekTierChange(this)">
-          <span class="seva-label">Abhishek with family</span>
+          <span class="seva-label">Abhishek Seva with family</span>
           <span class="seva-price">₹1100</span>
         </label>
         <label class="seva-option">
           <input type="checkbox" class="abhishek-tier" value="silver_kalash" onchange="onAbhishekTierChange(this)">
-          <span class="seva-label">Silver Kalash Abhishek with family</span>
+          <span class="seva-label">Silver Kalash Abhishek Seva with family</span>
           <span class="seva-price">₹2500</span>
         </label>
         <label class="seva-option">
           <input type="checkbox" class="abhishek-tier" value="golden_kalash" onchange="onAbhishekTierChange(this)">
-          <span class="seva-label">Golden Kalash Abhishek with family</span>
+          <span class="seva-label">Golden Kalash Abhishek Seva with family</span>
           <span class="seva-price">₹5001</span>
         </label>
       </div>
@@ -377,8 +377,8 @@
     let cachedInvitationCanvas = null;
 
     function abhishekLabel(amount) {
-      if (amount === 2500) return 'Silver Kalash Abhishek';
-      if (amount === 5001) return 'Golden Kalash Abhishek';
+      if (amount === 2500) return 'Silver Kalash Abhishek Seva';
+      if (amount === 5001) return 'Golden Kalash Abhishek Seva';
       return 'Abhishek Seva';
     }
 
@@ -840,7 +840,7 @@
         order_id: order.order_id,
         name: 'ISKCON Janmashtami 2026',
         description: `Entry token — ${payload.persons} family member${payload.persons > 1 ? 's' : ''}`
-          + (payload.aarti ? ' + Aarti' : '')
+          + (payload.aarti ? ' + Aarti Seva' : '')
           + (payload.abhishek_tier && payload.abhishek_tier !== 'none' ? ` + ${abhishekLabel(PRICE_ABHISHEK_TIERS[payload.abhishek_tier])}` : ''),
         image: 'iskcon_logo_icon.png',
         prefill: { name: payload.name, contact: payload.mobile },

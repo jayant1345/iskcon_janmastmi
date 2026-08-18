@@ -1008,9 +1008,9 @@ def create_razorpay_payment_link():
 
     seva_bits = []
     if aarti_amount:
-        seva_bits.append('Aarti')
+        seva_bits.append('Aarti Seva')
     if abhishek_amount:
-        seva_bits.append({1100: 'Abhishek', 2500: 'Silver Kalash Abhishek', 5001: 'Golden Kalash Abhishek'}.get(abhishek_amount, 'Abhishek'))
+        seva_bits.append({1100: 'Abhishek Seva', 2500: 'Silver Kalash Abhishek Seva', 5001: 'Golden Kalash Abhishek Seva'}.get(abhishek_amount, 'Abhishek Seva'))
     description = f'ISKCON Janmashtami 2026 Entry Token ({persons} member{"s" if persons > 1 else ""})'
     if seva_bits:
         description += ' + ' + ' + '.join(seva_bits)
