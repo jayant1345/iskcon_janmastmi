@@ -1158,13 +1158,14 @@ def register_public_payment_link_complete():
     }
     return _create_registration(reg_data, registered_by=None, category='online')
 
-@app.route('/api/razorpay/volunteer-qr', methods=['POST'])
+@app.route('/api/razorpay/volunteer-payment-link', methods=['POST'])
 @login_required
-def create_volunteer_razorpay_qr():
-    """Logged-in volunteer flow -- creates a real Razorpay UPI-intent QR Code (not a
-    Payment Link rendered as a QR) for an in-person registration. The customer scans it
-    directly with any UPI app and pays -- no redirect to a Razorpay-hosted checkout page.
-    The volunteer's device polls /volunteer-qr/<id>/status instead of a callback."""
+def create_volunteer_razorpay_link():
+    """Logged-in volunteer flow -- creates a Razorpay Payment Link for an in-person
+    registration and returns its short_url so the volunteer's app can render it as a QR
+    code for the customer to scan with their own phone (instead of Checkout/redirect).
+    No callback_url is set -- nothing needs to redirect anywhere; the volunteer's device
+    polls /volunteer-payment-link/<id>/status instead."""
     if not razorpay_client:
         return jsonify({'error': 'Online payment is not available right now'}), 503
 
@@ -1193,15 +1194,18 @@ def create_volunteer_razorpay_qr():
     if amount_paise <= 0:
         return jsonify({'error': 'Nothing to pay'}), 400
 
+    reference_id = secrets.token_hex(12)
     try:
-        qr = razorpay_client.qrcode.create({
-            'type': 'upi_qr',
-            'name': f'ISKCON Janmashtami {name}'[:50],
-            'usage': 'single_use',
-            'fixed_amount': True,
-            'payment_amount': amount_paise,
+        link = razorpay_client.payment_link.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'accept_partial': False,
             'description': f'ISKCON Janmashtami 2026 Entry Token ({persons} member{"s" if persons > 1 else ""})',
-            'close_by': int(time.time()) + VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS,
+            'customer': {'name': name[:100], 'contact': mobile},
+            'notify': {'sms': False, 'email': False},
+            'reminder_enable': False,
+            'reference_id': reference_id,
+            'expire_by': int(time.time()) + VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS,
             'notes': {
                 'event': 'ISKCON Janmashtami 2026 Volunteer-Assisted Registration',
                 'name': name[:255],
@@ -1215,45 +1219,36 @@ def create_volunteer_razorpay_qr():
             },
         })
         return jsonify({
-            'qr_id': qr['id'],
-            'image_url': qr['image_url'],
+            'link_id': link['id'],
+            'short_url': link['short_url'],
             'amount': amount_paise // 100,
             'expires_in': VOLUNTEER_QR_PAYMENT_WINDOW_SECONDS,
         })
     except Exception as e:
-        log.error(f'razorpay volunteer qrcode create error: {e}')
+        log.error(f'razorpay volunteer payment_link create error: {e}')
         return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
 
-@app.route('/api/razorpay/volunteer-qr/<qr_id>/status', methods=['GET'])
+@app.route('/api/razorpay/volunteer-payment-link/<link_id>/status', methods=['GET'])
 @login_required
-def volunteer_razorpay_qr_status(qr_id):
+def volunteer_razorpay_link_status(link_id):
     """Polled by the volunteer's app after showing the Razorpay QR. Pulls status straight
     from Razorpay's API using our own secret-keyed client -- never trusts anything the
-    browser reports -- so this is authoritative the moment Razorpay shows the QR paid."""
+    browser reports -- so this is authoritative the moment Razorpay shows the link paid."""
     if not razorpay_client:
         return jsonify({'error': 'Online payment is not available right now'}), 503
 
     try:
-        qr = razorpay_client.qrcode.fetch(qr_id)
+        link = razorpay_client.payment_link.fetch(link_id)
     except Exception as e:
-        log.error(f'razorpay volunteer qrcode fetch error: {e}')
+        log.error(f'razorpay volunteer payment_link fetch error: {e}')
         return jsonify({'error': 'Could not check payment status. Please try again.'}), 500
 
-    if qr.get('status') != 'closed':
-        return jsonify({'status': qr.get('status', 'active')})
+    if link.get('status') != 'paid':
+        return jsonify({'status': link.get('status', 'created')})
 
-    if (qr.get('payments_amount_received') or 0) < (qr.get('payment_amount') or 0):
-        # Closed without being paid (expired, or manually closed) -- not a success.
-        return jsonify({'status': 'expired'})
-
-    try:
-        payments = razorpay_client.qrcode.fetch_all_payments(qr_id)
-    except Exception as e:
-        log.error(f'razorpay volunteer qrcode fetch_all_payments error: {e}')
-        return jsonify({'error': 'Could not verify payment. Please contact support.'}), 500
-
-    captured = next((p for p in payments.get('items', []) if p.get('status') == 'captured'), None)
-    payment_id = (captured or {}).get('id')
+    payments = link.get('payments') or []
+    captured = next((p for p in payments if p.get('status') == 'captured'), None) or (payments[-1] if payments else None)
+    payment_id = (captured or {}).get('payment_id') or (captured or {}).get('id')
     if not payment_id:
         return jsonify({'error': 'Payment marked paid but no payment record found. Please contact support.'}), 500
 
@@ -1271,7 +1266,11 @@ def volunteer_razorpay_qr_status(qr_id):
             'category': existing['category'],
         }), 200
 
-    notes = qr.get('notes') or {}
+    if link.get('amount_paid') != link.get('amount'):
+        log.error(f'Razorpay volunteer link amount mismatch: {link}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
+    notes = link.get('notes') or {}
     reg_data = {
         'name': notes.get('name', ''),
         'mobile': notes.get('mobile', ''),

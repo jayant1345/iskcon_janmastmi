@@ -1850,7 +1850,7 @@
     // in flight, piling up overlapping calls and making the network worse right when it's
     // already struggling. Each fetch also has its own timeout so one stalled request can't
     // stall the whole chain -- this keeps payment detection latency from ever creeping up.
-    let razorpayQrId = null;
+    let razorpayQrLinkId = null;
     let razorpayQrPollTimer = null;
     let razorpayQrPollStartedAt = null;
     let razorpayQrPollActive = false;
@@ -1881,7 +1881,7 @@
 
     function resetVolunteerRazorpaySection() {
       stopVolunteerRazorpayPolling();
-      razorpayQrId = null;
+      razorpayQrLinkId = null;
       document.getElementById('payment-razorpay-generate-btn').classList.remove('hidden');
       document.getElementById('payment-razorpay-qr-wrap').classList.add('hidden');
       document.getElementById('payment-razorpay-qrcode').innerHTML = '';
@@ -1912,7 +1912,7 @@
       try {
         // No artificial timeout/abort here -- always wait for Razorpay's actual reply,
         // however long that takes on a slow connection, instead of giving up early.
-        const res = await fetch(`${API_BASE}/api/razorpay/volunteer-qr`, {
+        const res = await fetch(`${API_BASE}/api/razorpay/volunteer-payment-link`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1927,7 +1927,7 @@
           return;
         }
 
-        razorpayQrId = data.qr_id;
+        razorpayQrLinkId = data.link_id;
         razorpayQrWindowMs = (data.expires_in || 900) * 1000;
         btn.classList.add('hidden');
         btn.disabled = false;
@@ -1939,10 +1939,12 @@
         document.getElementById('payment-upi-toggle').checked = false;
         setPersonalUpiVisible(false);
 
-        // Razorpay's QR Code API returns a ready-made image of the actual UPI-intent QR --
-        // display it directly instead of re-encoding a URL into our own client-side QR.
+        // Payment Links don't return a ready-made QR image (unlike the QR Code API, which
+        // isn't enabled on this Razorpay account yet) -- render the link's URL as a QR
+        // client-side; scanning it opens Razorpay's hosted checkout page.
         const qrContainer = document.getElementById('payment-razorpay-qrcode');
-        qrContainer.innerHTML = `<img src="${data.image_url}" alt="Razorpay UPI QR" style="width:180px; height:180px; display:block;">`;
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: data.short_url, width: 180, height: 180, colorDark: '#0F172A', colorLight: '#FFFFFF' });
         document.getElementById('payment-razorpay-qr-container').classList.add('rzp-waiting');
         document.getElementById('payment-razorpay-qr-wrap').classList.remove('hidden');
         document.getElementById('payment-razorpay-status').innerHTML =
@@ -1969,7 +1971,7 @@
     }
 
     async function pollVolunteerRazorpayStatus() {
-      if (!razorpayQrPollActive || !razorpayQrId) return;
+      if (!razorpayQrPollActive || !razorpayQrLinkId) return;
 
       if (Date.now() - razorpayQrPollStartedAt > razorpayQrWindowMs) {
         markVolunteerRazorpayExpired();
@@ -1978,7 +1980,7 @@
 
       try {
         const res = await fetchWithTimeout(
-          `${API_BASE}/api/razorpay/volunteer-qr/${razorpayQrId}/status`,
+          `${API_BASE}/api/razorpay/volunteer-payment-link/${razorpayQrLinkId}/status`,
           { credentials: 'include' },
           RAZORPAY_QR_FETCH_TIMEOUT_MS
         );
