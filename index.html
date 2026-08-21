@@ -1069,6 +1069,9 @@
                 <option value="volunteer">Volunteer-Registered</option>
                 <option value="online">Online (Self)</option>
               </select>
+              <select id="reg-registered-by-filter" class="form-control" style="width: 190px; font-size: 0.85rem;" onchange="filterRegistrationsTable()">
+                <option value="">All Registered By</option>
+              </select>
               <input type="text" id="reg-search" class="form-control" placeholder="Search by name, token, mobile..." style="width: 260px; font-size: 0.85rem;" onkeyup="filterRegistrationsTable()">
             </div>
           </div>
@@ -2880,8 +2883,9 @@
         const data = await res.json();
         allRegistrationsByToken = Object.fromEntries(data.registrations.map(r => [r.token, r]));
         const tbody = document.getElementById('registrations-table-body');
+        const registeredByLabel = r => r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System');
         tbody.innerHTML = data.registrations.map(r => `
-          <tr data-category="${r.category || 'volunteer'}">
+          <tr data-category="${r.category || 'volunteer'}" data-registered-by="${registeredByLabel(r).replace(/"/g, '&quot;')}">
             <td><strong style="color: var(--accent-gold-light);">${r.token}</strong></td>
             <td>${r.name}</td>
             <td>${r.mobile}</td>
@@ -2889,7 +2893,7 @@
             <td>${r.persons}</td>
             <td>${paidCellHtml(r)}</td>
             <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>'}</td>
-            <td>${r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System')}</td>
+            <td>${registeredByLabel(r)}</td>
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
             </td>
@@ -2906,6 +2910,17 @@
             </td>` : ''}
           </tr>
         `).join('');
+
+        // Rebuild the "Registered By" filter options from whoever's actually registered
+        // at least one family so far, keeping the current selection if it's still valid.
+        const byFilter = document.getElementById('reg-registered-by-filter');
+        const previousChoice = byFilter.value;
+        const names = [...new Set(data.registrations.map(registeredByLabel))].sort((a, b) => a.localeCompare(b));
+        byFilter.innerHTML = '<option value="">All Registered By</option>' +
+          names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+        if (names.includes(previousChoice)) byFilter.value = previousChoice;
+
+        filterRegistrationsTable();
       } catch (err) {
         console.error('Registrations load error:', err);
       }
@@ -3010,12 +3025,14 @@
     function filterRegistrationsTable() {
       const q = document.getElementById('reg-search').value.toLowerCase();
       const cat = document.getElementById('reg-category-filter').value;
+      const by = document.getElementById('reg-registered-by-filter').value;
       const rows = document.querySelectorAll('#registrations-table-body tr');
       rows.forEach(r => {
         const text = r.textContent.toLowerCase();
         const matchesText = text.includes(q);
         const matchesCat = !cat || r.dataset.category === cat;
-        r.style.display = (matchesText && matchesCat) ? '' : 'none';
+        const matchesBy = !by || r.dataset.registeredBy === by;
+        r.style.display = (matchesText && matchesCat && matchesBy) ? '' : 'none';
       });
     }
 
