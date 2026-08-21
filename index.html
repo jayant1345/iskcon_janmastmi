@@ -1224,6 +1224,11 @@
                 <i class="fa-solid fa-file-csv"></i> Download CSV Data Report
               </button>
 
+              <button class="btn-primary" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white;" onclick="downloadXLSXBackup()">
+                <i class="fa-solid fa-file-excel"></i> Download Full Backup (XLSX)
+              </button>
+              <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: -0.5rem;">Every registration with who invited whom, payment/attendance status, and Aarti/Abhishek/Donation rows highlighted for quick follow-up (see the sheet's Legend tab).</p>
+
               <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(239, 68, 68, 0.3);">
                 <h4 style="color: #FCA5A5; margin-bottom: 0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</h4>
                 <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Reset registration database and attendance records.</p>
@@ -3220,6 +3225,34 @@
         window.URL.revokeObjectURL(url);
       } catch (err) {
         alert('Could not reach the server to download the report. Please check your connection and try again.');
+      }
+    }
+
+    async function downloadXLSXBackup() {
+      try {
+        const res = await fetch(`${API_BASE}/api/export/xlsx`, { credentials: 'include' });
+        if (res.status === 401) {
+          alert('Your session has expired. Please log in again, then try downloading the backup.');
+          currentUser = null;
+          showLoginView();
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert('Could not generate the backup: ' + (err.error || `Server error (${res.status})`));
+          return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'iskcon_janmastmi_backup_2026.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Could not reach the server to download the backup. Please check your connection and try again.');
       }
     }
 

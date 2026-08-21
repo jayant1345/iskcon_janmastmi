@@ -15,8 +15,11 @@ import traceback
 import pymysql
 import pymysql.cursors
 from datetime import datetime, timedelta
+from io import BytesIO
 import logging
 import razorpay
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -1613,40 +1616,46 @@ def gate_scan():
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
-#  CSV REPORT EXPORT
+#  CSV / XLSX REPORT EXPORT
 # ============================================================
+def _fetch_full_registration_report_rows():
+    """Single source of truth for the full backup/report data -- every registration
+    plus who registered it, who collected payment, and gate-attendance status. Used by
+    both the CSV and XLSX export endpoints so they can never drift out of sync."""
+    return db_query("""
+        SELECT
+            r.token,
+            r.name,
+            r.address,
+            r.mobile,
+            r.persons AS registered_members,
+            r.paid,
+            r.token_amount,
+            r.aarti_amount,
+            r.abhishek_amount,
+            r.donation_amount,
+            r.payment_mode,
+            r.payment_ref,
+            r.free_entry,
+            r.category,
+            r.reg_at,
+            COALESCE(u.name, 'Unknown')   AS registered_by_user,
+            COALESCE(c.name, '')          AS collected_by_user,
+            IF(a.token IS NOT NULL,'Yes','No') AS attended,
+            COALESCE(a.persons, 0)             AS members_counted,
+            COALESCE(DATE_FORMAT(a.gate_time,'%%d/%%m/%%Y %%H:%%i'), '') AS gate_time
+        FROM registrations r
+        LEFT JOIN users u ON u.id = r.registered_by
+        LEFT JOIN users c ON c.id = r.collected_by
+        LEFT JOIN attendance a ON r.token = a.token
+        ORDER BY r.id ASC
+    """)
+
 @app.route('/api/export/csv', methods=['GET'])
 @login_required
 def export_csv():
     try:
-        rows = db_query("""
-            SELECT
-                r.token,
-                r.name,
-                r.address,
-                r.mobile,
-                r.persons AS registered_members,
-                r.paid,
-                r.token_amount,
-                r.aarti_amount,
-                r.abhishek_amount,
-                r.donation_amount,
-                r.payment_mode,
-                r.payment_ref,
-                r.free_entry,
-                r.category,
-                r.reg_at,
-                COALESCE(u.name, 'Unknown')   AS registered_by_user,
-                COALESCE(c.name, '')          AS collected_by_user,
-                IF(a.token IS NOT NULL,'Yes','No') AS attended,
-                COALESCE(a.persons, 0)             AS members_counted,
-                COALESCE(DATE_FORMAT(a.gate_time,'%%d/%%m/%%Y %%H:%%i'), '') AS gate_time
-            FROM registrations r
-            LEFT JOIN users u ON u.id = r.registered_by
-            LEFT JOIN users c ON c.id = r.collected_by
-            LEFT JOIN attendance a ON r.token = a.token
-            ORDER BY r.id ASC
-        """)
+        rows = _fetch_full_registration_report_rows()
 
         lines = ['Token,Family Head,Address,Mobile,Registered Members,Token Amount (Rs),Aarti (Rs),Abhishek (Rs),Donation (Rs) [80G],Total Paid (Rs),Payment Mode,Payment Reference,Free Entry,Category,Registered At,Registered By Volunteer,Payment Collected By,Gate Attended,Gate Members Counted,Gate Entry Time']
         for r in rows:
@@ -1672,6 +1681,98 @@ def export_csv():
         )
     except Exception as e:
         log.error(f'export_csv error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/export/xlsx', methods=['GET'])
+@admin_required
+def export_xlsx():
+    """Full backup of every registration -- who's invited, who registered/collected
+    payment for them, and gate status -- as a real .xlsx workbook. Rows with a special
+    seva (Aarti/Abhishek) or a standalone donation are highlighted so they're easy to
+    spot and follow up with separately, since this system doesn't have an automated
+    backup job yet -- this is the manual stand-in until one exists."""
+    try:
+        rows = _fetch_full_registration_report_rows()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Registrations'
+
+        headers = ['Token', 'Family Head', 'Address', 'Mobile', 'Registered Members',
+                   'Token Amount (Rs)', 'Aarti Seva (Rs)', 'Abhishek Seva (Rs)', 'Donation (Rs) [80G]',
+                   'Total Paid (Rs)', 'Payment Mode', 'Payment Reference', 'Free Entry', 'Category',
+                   'Registered At', 'Registered By Volunteer', 'Payment Collected By',
+                   'Gate Attended', 'Gate Members Counted', 'Gate Entry Time']
+        header_fill = PatternFill(start_color='0F3D46', end_color='0F3D46', fill_type='solid')
+        header_font = Font(color='FBBF24', bold=True)
+        for col, title in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col, value=title)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        ws.freeze_panes = 'A2'
+
+        # Special-seva / donation highlighting -- makes it easy to scan for devotees who
+        # gave beyond the base entry token, e.g. for personal follow-up or acknowledgement.
+        aarti_fill = PatternFill(start_color='FEF3C7', end_color='FEF3C7', fill_type='solid')
+        abhishek_fill = PatternFill(start_color='EDE9FE', end_color='EDE9FE', fill_type='solid')
+        donation_fill = PatternFill(start_color='D1FAE5', end_color='D1FAE5', fill_type='solid')
+        special_name_fill = PatternFill(start_color='FDE68A', end_color='FDE68A', fill_type='solid')
+        special_name_font = Font(bold=True)
+
+        for row_idx, r in enumerate(rows, start=2):
+            reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
+            values = [
+                r['token'], r['name'], r['address'], r['mobile'], r['registered_members'],
+                r['token_amount'], r['aarti_amount'], r['abhishek_amount'], r['donation_amount'],
+                r['paid'], r['payment_mode'], r['payment_ref'] or '', 'Yes' if r['free_entry'] else 'No',
+                r['category'], reg_at, r['registered_by_user'], r['collected_by_user'],
+                r['attended'], r['members_counted'], r['gate_time'],
+            ]
+            for col, value in enumerate(values, start=1):
+                ws.cell(row=row_idx, column=col, value=value)
+
+            if r['aarti_amount']:
+                ws.cell(row=row_idx, column=7).fill = aarti_fill
+            if r['abhishek_amount']:
+                ws.cell(row=row_idx, column=8).fill = abhishek_fill
+            if r['donation_amount']:
+                ws.cell(row=row_idx, column=9).fill = donation_fill
+            if r['aarti_amount'] or r['abhishek_amount'] or r['donation_amount']:
+                name_cell = ws.cell(row=row_idx, column=2)
+                name_cell.fill = special_name_fill
+                name_cell.font = special_name_font
+
+        widths = [8, 22, 30, 13, 10, 12, 12, 14, 16, 12, 12, 16, 10, 11, 16, 20, 18, 12, 12, 16]
+        for col, width in enumerate(widths, start=1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
+
+        # Legend sheet so the highlighting is self-explanatory without needing to ask.
+        legend = wb.create_sheet('Legend')
+        legend['A1'] = 'Highlight colors used on the Registrations sheet'
+        legend['A1'].font = Font(bold=True)
+        legend_rows = [
+            ('Aarti Seva amount cell', aarti_fill, 'Aarti Seva amount cell'),
+            ('Abhishek Seva amount cell', abhishek_fill, 'Abhishek Seva amount cell'),
+            ('Donation amount cell', donation_fill, 'Donation amount cell'),
+            ('Family Head name (bold)', special_name_fill, 'Any special seva or donation was given -- easy row-level scan'),
+        ]
+        for i, (label, fill, desc) in enumerate(legend_rows, start=2):
+            legend.cell(row=i, column=1, value=label).fill = fill
+            legend.cell(row=i, column=2, value=desc)
+        legend.column_dimensions['A'].width = 28
+        legend.column_dimensions['B'].width = 55
+
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return Response(
+            buf.read(),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': 'attachment; filename=iskcon_janmastmi_backup_2026.xlsx'}
+        )
+    except Exception as e:
+        log.error(f'export_xlsx error: {e}\n{traceback.format_exc()}')
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
