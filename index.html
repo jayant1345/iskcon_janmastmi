@@ -420,6 +420,20 @@
       overflow: visible !important;
     }
 
+    /* Full-window view for wide tables (e.g. the leaderboard) that don't fit
+       comfortably in the normal two-column dashboard layout. */
+    .glass-card-fullscreen {
+      position: fixed !important;
+      inset: 0;
+      z-index: 999;
+      width: 100vw;
+      height: 100vh;
+      max-width: 100vw;
+      border-radius: 0;
+      margin: 0;
+      overflow-y: auto;
+    }
+
     .glass-card-title {
       font-size: 1.25rem;
       font-weight: 700;
@@ -867,6 +881,14 @@
           <div id="leaderboard-section" class="glass-card hidden">
             <div class="glass-card-title">
               <span><i class="fa-solid fa-trophy"></i> Volunteer Leaderboard</span>
+              <span>
+                <button id="leaderboard-expand-btn" class="nav-tab" style="padding: 0.3rem 0.7rem; font-size: 0.8rem;" onclick="toggleLeaderboardFullscreen()">
+                  <i class="fa-solid fa-expand"></i> Full View
+                </button>
+                <button id="leaderboard-back-btn" class="nav-tab hidden" style="padding: 0.3rem 0.7rem; font-size: 0.8rem;" onclick="toggleLeaderboardFullscreen()">
+                  <i class="fa-solid fa-arrow-left"></i> Back
+                </button>
+              </span>
             </div>
             <div class="table-responsive">
               <table class="custom-table">
@@ -1638,6 +1660,15 @@
     }
 
     let volunteersById = {};
+
+    function toggleLeaderboardFullscreen() {
+      const section = document.getElementById('leaderboard-section');
+      const expanding = !section.classList.contains('glass-card-fullscreen');
+      section.classList.toggle('glass-card-fullscreen', expanding);
+      document.getElementById('leaderboard-expand-btn').classList.toggle('hidden', expanding);
+      document.getElementById('leaderboard-back-btn').classList.toggle('hidden', !expanding);
+      document.body.style.overflow = expanding ? 'hidden' : '';
+    }
 
     function renderLeaderboard(users) {
       volunteersById = Object.fromEntries(users.map(u => [u.id, u]));
