@@ -875,7 +875,8 @@
                     <th>Volunteer Name</th>
                     <th>Registrations</th>
                     <th>Gate Scanned (Checked-In)</th>
-                    <th>Collection</th>
+                    <th>Total Collection</th>
+                    <th>Cash Held</th>
                     <th>Submitted</th>
                     <th>Balance Due</th>
                     <th>Action</th>
@@ -1602,8 +1603,10 @@
           loadSettlementHistory();
         } else {
           document.getElementById('stat-mybalance').textContent = `₹${(mData.balance_due || 0).toLocaleString('en-IN')}`;
+          // Only cash counts toward balance due -- Razorpay and the shared UPI QR both
+          // settle directly into the org's account, so they're excluded here.
           document.getElementById('stat-mycollection-subtext').textContent =
-            `Collected ₹${mData.collection || 0} | Submitted ₹${mData.submitted || 0}`;
+            `Cash Collected ₹${mData.cash_collection || 0} | Submitted ₹${mData.submitted || 0}`;
         }
       } catch (err) {
         console.error('Stats load error:', err);
@@ -1645,6 +1648,7 @@
           <td>${u.families_registered} fam. / ${u.persons_registered} pers.</td>
           <td>${u.families_scanned} fam. / ${u.persons_scanned} pers.</td>
           <td style="color: var(--accent-gold-light); font-weight: 700;">₹${u.collection}</td>
+          <td>₹${u.cash_collection}</td>
           <td>₹${u.submitted}</td>
           <td style="color: ${u.balance_due > 0 ? '#FCA5A5' : '#34D399'}; font-weight: 700;">₹${u.balance_due}</td>
           <td>
@@ -1662,7 +1666,7 @@
       document.getElementById('settlement-form').dataset.volunteerId = volunteerId;
       document.getElementById('settlement-volunteer-name').textContent = u.name;
       document.getElementById('settlement-balance-hint').textContent =
-        `Collected: ₹${u.collection} | Already submitted: ₹${u.submitted} | Balance due: ₹${u.balance_due}`;
+        `Cash held: ₹${u.cash_collection} (₹${u.collection} total incl. Razorpay/UPI) | Already submitted: ₹${u.submitted} | Balance due: ₹${u.balance_due}`;
       document.getElementById('settlement-amount').value = u.balance_due > 0 ? u.balance_due : '';
       document.getElementById('settlement-note').value = '';
       document.getElementById('settlement-modal').classList.add('active');

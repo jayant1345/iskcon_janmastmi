@@ -737,6 +737,7 @@ def user_stats():
                 COALESCE(reg.families_registered, 0) AS families_registered,
                 COALESCE(reg.persons_registered, 0)  AS persons_registered,
                 COALESCE(reg.collection, 0)          AS collection,
+                COALESCE(reg.cash_collection, 0)      AS cash_collection,
                 COALESCE(reg.token_total, 0)         AS token_total,
                 COALESCE(reg.aarti_total, 0)         AS aarti_total,
                 COALESCE(reg.abhishek_total, 0)      AS abhishek_total,
@@ -750,6 +751,7 @@ def user_stats():
                        COUNT(*)             AS families_registered,
                        SUM(persons)         AS persons_registered,
                        SUM(paid)            AS collection,
+                       SUM(CASE WHEN payment_mode = 'cash' THEN paid ELSE 0 END) AS cash_collection,
                        SUM(token_amount)    AS token_total,
                        SUM(aarti_amount)    AS aarti_total,
                        SUM(abhishek_amount) AS abhishek_total,
@@ -770,11 +772,14 @@ def user_stats():
             ORDER BY collection DESC, families_scanned DESC
         """)
         for row in rows:
-            for key in ('families_registered', 'persons_registered', 'collection', 'token_total',
-                        'aarti_total', 'abhishek_total', 'donation_total', 'families_scanned',
-                        'persons_scanned', 'submitted'):
+            for key in ('families_registered', 'persons_registered', 'collection', 'cash_collection',
+                        'token_total', 'aarti_total', 'abhishek_total', 'donation_total',
+                        'families_scanned', 'persons_scanned', 'submitted'):
                 row[key] = int(row[key])
-            row['balance_due'] = row['collection'] - row['submitted']
+            # Only cash is physically held by the volunteer -- Razorpay and the shared
+            # organizational UPI QR both settle straight into the org's own account, so
+            # they're never "owed" back and must not inflate balance_due.
+            row['balance_due'] = row['cash_collection'] - row['submitted']
         return jsonify({'user_stats': rows})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -786,7 +791,8 @@ def my_stats():
         uid = session['user_id']
         row = db_query("""
             SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons,
-                   COALESCE(SUM(paid),0) AS collection
+                   COALESCE(SUM(paid),0) AS collection,
+                   COALESCE(SUM(CASE WHEN payment_mode = 'cash' THEN paid ELSE 0 END),0) AS cash_collection
             FROM registrations WHERE registered_by = %s
         """, (uid,), fetch='one')
         sett_row = db_query(
@@ -794,13 +800,17 @@ def my_stats():
             (uid,), fetch='one'
         )
         collection = int(row['collection'])
+        cash_collection = int(row['cash_collection'])
         submitted = int(sett_row['submitted'])
         return jsonify({
             'families': row['families'],
             'persons': int(row['persons']),
             'collection': collection,
+            # Only cash is physically held by the volunteer -- Razorpay and the shared
+            # organizational UPI QR both settle straight into the org's own account.
+            'cash_collection': cash_collection,
             'submitted': submitted,
-            'balance_due': collection - submitted,
+            'balance_due': cash_collection - submitted,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
