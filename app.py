@@ -1693,22 +1693,6 @@ def clear_all():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/clear-attendance', methods=['POST'])
-@admin_required
-def clear_attendance():
-    """Wipes only gate-scan attendance records -- registrations (and any money already
-    collected) are untouched. Useful for clearing pre-event test scans without losing
-    real registrations."""
-    secret = request.get_json().get('secret', '')
-    if secret != 'ISKCON_JANMASTMI_CLEAR_2026':
-        return jsonify({'error': 'Invalid confirmation secret code'}), 403
-    try:
-        db_execute("DELETE FROM attendance")
-        log.warning('ATTENDANCE DATA CLEARED BY ADMIN (registrations untouched)')
-        return jsonify({'success': True, 'message': 'Attendance/gate-scan records cleared. Registrations were not affected.'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 # ============================================================
 #  MAIN SERVER RUNNER
 # ============================================================

@@ -1231,9 +1231,6 @@
                   <label class="form-label" style="color: #FCA5A5;">Confirmation Password</label>
                   <input type="password" id="clear-data-password" class="form-control" placeholder="Enter confirmation password to unlock" autocomplete="off" oninput="checkClearDataPassword()">
                 </div>
-                <button id="clear-attendance-btn" class="btn-primary" style="background: rgba(245, 158, 11, 0.2); border: 1px solid #F59E0B; color: #FBBF24; opacity: 0.4; cursor: not-allowed; transition: opacity 0.2s; margin-bottom: 0.6rem;" onclick="triggerClearAttendance()" disabled>
-                  <i class="fa-solid fa-door-open"></i> Clear Attendance/Gate-Scan Only (keeps registrations)
-                </button>
                 <button id="clear-data-btn" class="btn-primary" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; color: #FCA5A5; opacity: 0.4; cursor: not-allowed; transition: opacity 0.2s;" onclick="triggerClearData()" disabled>
                   <i class="fa-solid fa-trash-can"></i> Clear All Data
                 </button>
@@ -3230,38 +3227,11 @@
 
     function checkClearDataPassword() {
       const input = document.getElementById('clear-data-password');
+      const btn = document.getElementById('clear-data-btn');
       const unlocked = input.value === CLEAR_DATA_SECRET;
-      [document.getElementById('clear-data-btn'), document.getElementById('clear-attendance-btn')].forEach(btn => {
-        btn.disabled = !unlocked;
-        btn.style.opacity = unlocked ? '1' : '0.4';
-        btn.style.cursor = unlocked ? 'pointer' : 'not-allowed';
-      });
-    }
-
-    async function triggerClearAttendance() {
-      const input = document.getElementById('clear-data-password');
-      if (input.value !== CLEAR_DATA_SECRET) return; // button should be disabled in this case anyway
-      if (!confirm('This will permanently erase all gate-scan/attendance records. Registrations (and any money already collected) are NOT affected. Continue?')) return;
-
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/clear-attendance`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ secret: input.value })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          alert('Attendance/gate-scan records cleared. Registrations were not affected.');
-          input.value = '';
-          checkClearDataPassword();
-          loadDashboardStats();
-        } else {
-          alert('Clear failed: ' + (data.error || 'Error'));
-        }
-      } catch (err) {
-        alert('Server error while clearing attendance data.');
-      }
+      btn.disabled = !unlocked;
+      btn.style.opacity = unlocked ? '1' : '0.4';
+      btn.style.cursor = unlocked ? 'pointer' : 'not-allowed';
     }
 
     async function triggerClearData() {
