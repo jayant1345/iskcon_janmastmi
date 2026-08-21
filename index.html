@@ -896,6 +896,7 @@
                   <tr>
                     <th>Volunteer Name</th>
                     <th>Registrations</th>
+                    <th>Today's Registrations</th>
                     <th>Gate Scanned (Checked-In)</th>
                     <th>Total Collection</th>
                     <th>Cash Held</th>
@@ -1682,6 +1683,7 @@
         <tr>
           <td><strong>${u.name}</strong> <small style="color: var(--text-muted);">(@${u.username})</small></td>
           <td>${u.families_registered} fam. / ${u.persons_registered} pers.</td>
+          <td style="color: var(--accent-magenta); font-weight: 700;">${u.families_today} fam. / ${u.persons_today} pers.</td>
           <td>${u.families_scanned} fam. / ${u.persons_scanned} pers.</td>
           <td style="color: var(--accent-gold-light); font-weight: 700;">₹${u.collection}</td>
           <td>₹${u.cash_collection}</td>

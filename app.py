@@ -747,6 +747,8 @@ def user_stats():
                 COALESCE(reg.donation_total, 0)      AS donation_total,
                 COALESCE(att.families_scanned, 0)    AS families_scanned,
                 COALESCE(att.persons_scanned, 0)     AS persons_scanned,
+                COALESCE(today.families_today, 0)    AS families_today,
+                COALESCE(today.persons_today, 0)     AS persons_today,
                 COALESCE(sett.submitted, 0)          AS submitted
             FROM users u
             LEFT JOIN (
@@ -768,6 +770,12 @@ def user_stats():
                 GROUP BY scanned_by
             ) att ON att.scanned_by = u.id
             LEFT JOIN (
+                SELECT registered_by, COUNT(*) AS families_today, SUM(persons) AS persons_today
+                FROM registrations
+                WHERE DATE(reg_at) = CURDATE()
+                GROUP BY registered_by
+            ) today ON today.registered_by = u.id
+            LEFT JOIN (
                 SELECT volunteer_id, SUM(amount) AS submitted
                 FROM settlements
                 GROUP BY volunteer_id
@@ -777,7 +785,7 @@ def user_stats():
         for row in rows:
             for key in ('families_registered', 'persons_registered', 'collection', 'cash_collection',
                         'token_total', 'aarti_total', 'abhishek_total', 'donation_total',
-                        'families_scanned', 'persons_scanned', 'submitted'):
+                        'families_scanned', 'persons_scanned', 'families_today', 'persons_today', 'submitted'):
                 row[key] = int(row[key])
             # Only cash is physically held by the volunteer -- Razorpay and the shared
             # organizational UPI QR both settle straight into the org's own account, so
