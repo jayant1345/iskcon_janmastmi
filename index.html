@@ -822,6 +822,20 @@
             <i class="fa-solid fa-hourglass-half stat-icon" style="color: #FBBF24;"></i>
           </div>
 
+          <div class="stat-card">
+            <div class="stat-label">Today's Registrations</div>
+            <div class="stat-value" id="stat-today-families" style="color: var(--accent-magenta);">0</div>
+            <div class="stat-subtext" id="stat-today-persons">0 Devotees Today</div>
+            <i class="fa-solid fa-calendar-day stat-icon" style="color: var(--accent-magenta);"></i>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">My Registrations</div>
+            <div class="stat-value" id="stat-my-families" style="color: var(--accent-peacock);">0</div>
+            <div class="stat-subtext" id="stat-my-persons">0 Devotees Registered by Me</div>
+            <i class="fa-solid fa-user-check stat-icon" style="color: var(--accent-peacock);"></i>
+          </div>
+
           <div id="stat-collection-card" class="stat-card hidden">
             <div class="stat-label">Total Collections</div>
             <div class="stat-value" id="stat-collection" style="color: var(--accent-gold-light);">₹0</div>
@@ -1558,6 +1572,8 @@
         document.getElementById('stat-att-families').textContent = stats.attended_families || 0;
         document.getElementById('stat-att-persons').textContent = `${stats.attended_persons || 0} Devotees Inside`;
         document.getElementById('stat-pending-families').textContent = stats.pending_families || 0;
+        document.getElementById('stat-today-families').textContent = stats.today_families || 0;
+        document.getElementById('stat-today-persons').textContent = `${stats.today_persons || 0} Devotees Today`;
 
         if (currentUser.role === 'admin' && stats.collection !== undefined) {
           document.getElementById('stat-collection').textContent = `₹${stats.collection.toLocaleString('en-IN')}`;
@@ -1568,6 +1584,13 @@
         const hData = await hRes.json();
         renderHourlyChart(hData.hourly);
 
+        // My Registrations -- shown for everyone (admin or volunteer), since admins can
+        // also register families themselves and want to see their own count.
+        const mRes = await fetch(`${API_BASE}/api/my-stats`, { credentials: 'include' });
+        const mData = await mRes.json();
+        document.getElementById('stat-my-families').textContent = mData.families || 0;
+        document.getElementById('stat-my-persons').textContent = `${mData.persons || 0} Devotees Registered by Me`;
+
         // Leaderboard (admin) / My Balance (volunteer)
         if (currentUser.role === 'admin') {
           const uRes = await fetch(`${API_BASE}/api/admin/user-stats`, { credentials: 'include' });
@@ -1575,8 +1598,6 @@
           renderLeaderboard(uData.user_stats);
           loadSettlementHistory();
         } else {
-          const mRes = await fetch(`${API_BASE}/api/my-stats`, { credentials: 'include' });
-          const mData = await mRes.json();
           document.getElementById('stat-mybalance').textContent = `₹${(mData.balance_due || 0).toLocaleString('en-IN')}`;
           document.getElementById('stat-mycollection-subtext').textContent =
             `Collected ₹${mData.collection || 0} | Submitted ₹${mData.submitted || 0}`;

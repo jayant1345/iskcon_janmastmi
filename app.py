@@ -695,12 +695,18 @@ def get_stats():
             "SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons FROM attendance",
             fetch='one'
         )
+        today_row = db_query("""
+            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons
+            FROM registrations WHERE DATE(reg_at) = CURDATE()
+        """, fetch='one')
         result = {
             'registered_families': reg_row['families'],
             'registered_persons':  int(reg_row['persons']),
             'attended_families':   att_row['families'],
             'attended_persons':    int(att_row['persons']),
             'pending_families':    max(0, reg_row['families'] - att_row['families']),
+            'today_families':      today_row['families'],
+            'today_persons':       int(today_row['persons']),
         }
         if session.get('role') == 'admin':
             result['collection'] = int(reg_row['collection'])
