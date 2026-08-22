@@ -6,3 +6,4 @@ gunicorn
 werkzeug
 razorpay
 openpyxl
+pyzipper

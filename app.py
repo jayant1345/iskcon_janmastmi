@@ -20,6 +20,8 @@ import logging
 import razorpay
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
+import pyzipper
+from decimal import Decimal
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -1781,6 +1783,79 @@ def export_xlsx():
         )
     except Exception as e:
         log.error(f'export_xlsx error: {e}\n{traceback.format_exc()}')
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+#  FULL SYSTEM BACKUP (password-protected, restore-ready SQL dump)
+# ============================================================
+BACKUP_TABLES = ['users', 'token_counter', 'settings', 'registrations', 'attendance', 'attendance_log', 'settlements']
+
+def _sql_literal(value):
+    """Renders a Python value as a MySQL SQL literal for a hand-built INSERT statement."""
+    if value is None:
+        return 'NULL'
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    if isinstance(value, (int, float, Decimal)):
+        return str(value)
+    if hasattr(value, 'strftime'):
+        # Covers both datetime and date -- date has no time component to format.
+        fmt = '%Y-%m-%d %H:%M:%S' if hasattr(value, 'hour') else '%Y-%m-%d'
+        return "'" + value.strftime(fmt) + "'"
+    return "'" + pymysql.converters.escape_string(str(value)) + "'"
+
+@app.route('/api/admin/backup', methods=['POST'])
+@admin_required
+def create_backup():
+    """Full database backup -- CREATE TABLE + every row as INSERT statements for every
+    table, self-contained enough to fully restore the database from scratch later. This
+    is a read-only operation (nothing here modifies the live system) -- only the
+    not-yet-built restore side would be destructive. Zipped with AES encryption using an
+    admin-chosen password, since this file contains everyone's mobile numbers, addresses,
+    and payment references."""
+    data = request.get_json() or {}
+    password = str(data.get('password', ''))
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+    try:
+        conn = get_db()
+        sql_parts = [
+            f"-- ISKCON Janmashtami 2026 -- full database backup\n"
+            f"-- Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+            f"-- Restore with: mysql -u <user> -p <database> < this_file.sql\n",
+            "SET FOREIGN_KEY_CHECKS=0;\n",
+        ]
+        with conn.cursor() as cur:
+            for table in BACKUP_TABLES:
+                cur.execute(f"SHOW CREATE TABLE `{table}`")
+                create_stmt = cur.fetchone()['Create Table']
+                sql_parts.append(f"\n-- ---- Table: {table} ----\n")
+                sql_parts.append(f"DROP TABLE IF EXISTS `{table}`;\n{create_stmt};\n")
+
+                cur.execute(f"SELECT * FROM `{table}`")
+                for row in cur.fetchall():
+                    cols = ', '.join(f"`{c}`" for c in row.keys())
+                    vals = ', '.join(_sql_literal(v) for v in row.values())
+                    sql_parts.append(f"INSERT INTO `{table}` ({cols}) VALUES ({vals});\n")
+        conn.close()
+        sql_parts.append("\nSET FOREIGN_KEY_CHECKS=1;\n")
+        sql_dump = ''.join(sql_parts)
+
+        buf = BytesIO()
+        with pyzipper.AESZipFile(buf, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
+            zf.setpassword(password.encode('utf-8'))
+            zf.writestr('iskcon_janmastmi_backup.sql', sql_dump)
+        buf.seek(0)
+
+        filename = f"iskcon_janmastmi_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.zip"
+        return Response(
+            buf.read(),
+            mimetype='application/zip',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    except Exception as e:
+        log.error(f'create_backup error: {e}\n{traceback.format_exc()}')
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
