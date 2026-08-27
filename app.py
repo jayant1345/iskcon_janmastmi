@@ -899,6 +899,38 @@ def delete_registration(token):
     log.warning(f'Registration deleted: Token={token} Name={row["name"]} By={session.get("username")}')
     return jsonify({'success': True, 'token': token})
 
+@app.route('/api/registrations/<token>/resend-receipt', methods=['POST'])
+@admin_required
+def resend_receipt(token):
+    """Admin-only: re-send the donation receipt email -- e.g. if it failed to
+    send at the time (Brevo IP not yet authorized, donor email typo'd)."""
+    row = db_query("SELECT * FROM registrations WHERE token=%s", (token,), fetch='one')
+    if not row:
+        return jsonify({'error': 'Registration not found'}), 404
+
+    data = request.get_json() or {}
+    to_email = str(data.get('email', '')).strip()
+    if not to_email:
+        return jsonify({'error': 'An email address is required (not stored on the registration itself)'}), 400
+
+    detail_bits = {
+        'Maha Aarti Seva Contribution': int(row['aarti_amount']),
+        'Maha Abhishek Seva Contribution': int(row['abhishek_amount']),
+        'Janmashtami Donation Seva': int(row['donation_amount']),
+    }
+    sent = send_receipt_email(
+        to_email=to_email,
+        name=row['name'],
+        total_paid=int(row['aarti_amount']) + int(row['abhishek_amount']) + int(row['donation_amount']),
+        detail_bits=detail_bits,
+        ref_id=row['token'],
+        address=row['address'],
+        mobile=row['mobile'],
+    )
+    if not sent:
+        return jsonify({'error': 'Email send failed -- check server logs for the Brevo error.'}), 502
+    return jsonify({'success': True, 'token': token, 'sent_to': to_email})
+
 def _create_registration(data, registered_by, category):
     name       = str(data.get('name', '')).strip()
     address    = str(data.get('address', '')).strip()
