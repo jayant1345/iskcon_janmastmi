@@ -325,11 +325,13 @@
     
     .receipt-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
       margin-top: 1.5rem;
     }
     .btn-receipt {
       flex: 1;
+      min-width: 130px;
       padding: 0.75rem;
       border-radius: 10px;
       border: none;
@@ -566,6 +568,9 @@
         </div>
 
         <div class="receipt-actions">
+          <button class="btn-receipt" style="background: #25D366; color: white;" onclick="sendDonationViaWhatsApp()">
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp
+          </button>
           <button class="btn-receipt btn-print" onclick="window.print()">
             <i class="fa-solid fa-print"></i> Print Receipt
           </button>
@@ -883,7 +888,9 @@
     }
 
     // Show Success Receipt Page
+    let currentDonationData = null;
     function showSuccessReceipt(data) {
+      currentDonationData = data;
       document.getElementById('donation-form').classList.add('hidden');
       document.getElementById('collage-container').classList.add('hidden');
       document.getElementById('receipt-view').classList.remove('hidden');
@@ -893,13 +900,35 @@
       document.getElementById('rec-name').innerText = data.name || '-';
       document.getElementById('rec-mobile').innerText = data.mobile || '-';
       document.getElementById('rec-address').innerText = data.address || '-';
-      
+
       document.getElementById('rec-aarti').innerText = `₹${(data.aarti_amount || 0).toLocaleString('en-IN')}`;
       document.getElementById('rec-abhishek').innerText = `₹${(data.abhishek_amount || 0).toLocaleString('en-IN')}`;
       document.getElementById('rec-general').innerText = `₹${(data.donation_amount || 0).toLocaleString('en-IN')}`;
       document.getElementById('rec-total').innerText = `₹${(data.paid || 0).toLocaleString('en-IN')}`;
-      
+
       document.getElementById('rec-pay-ref').innerText = data.payment_ref || 'Online Settlement';
+    }
+
+    // Builds a shareable receipt summary and opens it in WhatsApp (app or
+    // Web, whichever is already logged in) via a wa.me deep link.
+    function buildDonationWhatsAppMessage(data) {
+      const lines = [];
+      if (data.aarti_amount > 0) lines.push(`Aarti Seva: ₹${data.aarti_amount.toLocaleString('en-IN')}`);
+      if (data.abhishek_amount > 0) lines.push(`Abhishek Seva: ₹${data.abhishek_amount.toLocaleString('en-IN')}`);
+      if (data.donation_amount > 0) lines.push(`Janmashtami Donation Seva: ₹${data.donation_amount.toLocaleString('en-IN')}`);
+      const breakdown = lines.length ? lines.join('\n') : '';
+
+      return `🪈 *ISKCON Chandkheda Center — Śrī Kṛṣṇa Janmāṣṭamī* 🪈\n\nHare Krishna ${data.name} ji!\n\nYour donation has been received with gratitude 🙏\nReceipt No: *${data.token}*\nDate & Time: ${data.reg_at}\n\n${breakdown}\n\n*Total Donated: ₹${(data.paid || 0).toLocaleString('en-IN')}*\n\nThank you for your seva. Jai Shri Krishna! 🙏`;
+    }
+
+    function sendDonationViaWhatsApp() {
+      if (!currentDonationData) return;
+      const mobile = String(currentDonationData.mobile || '').trim();
+      const message = buildDonationWhatsAppMessage(currentDonationData);
+      const waUrl = /^\d{10}$/.test(mobile)
+        ? `https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
     }
 
     // Reset view
