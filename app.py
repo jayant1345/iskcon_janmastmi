@@ -1485,8 +1485,9 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                 <!-- Header -->
                 <tr>
                     <td align="center" style="background: linear-gradient(135deg, #0B132B 0%, #1A2E40 100%); padding: 30px 20px; border-bottom: 3px solid #F59E0B;">
-                        <h1 style="color: #F59E0B; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px;">ISKCON CHANDKHEDA CENTER</h1>
-                        <p style="color: #00E5FF; margin: 5px 0 0; font-size: 14px; text-transform: uppercase; font-weight: 600; letter-spacing: 2px;">Sri Krishna Janmashtami Mahotsav 2026</p>
+                        <img src="{request.host_url.rstrip('/')}/iskcon_logo_icon.png" alt="ISKCON Ahmedabad" width="64" height="64" style="height: 64px; width: auto; margin-bottom: 12px;">
+                        <h1 style="color: #F59E0B; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Noto Sans Devanagari', Arial, sans-serif;">श्री कृष्ण जन्माष्टमी महोत्सव २०२६</h1>
+                        <p style="color: #ffffff; margin: 8px 0 0; font-size: 15px; font-weight: 600;">ISKCON Chandkheda Center</p>
                     </td>
                 </tr>
                 <!-- Confirmation badge -->
