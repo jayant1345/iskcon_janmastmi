@@ -926,6 +926,7 @@ def resend_receipt(token):
         ref_id=row['token'],
         address=row['address'],
         mobile=row['mobile'],
+        reg_at=row['reg_at'].strftime('%d/%m/%Y %H:%M') if row.get('reg_at') else None,
     )
     if not sent:
         return jsonify({'error': 'Email send failed -- check server logs for the Brevo error.'}), 502
@@ -1440,28 +1441,42 @@ def register_public():
 # ============================================================
 import requests as http_requests
 
-def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address, mobile):
+# Short purpose line shown under each seva in the email receipt, matching
+# the descriptions donors see on the donation form itself.
+_SEVA_PURPOSE = {
+    'Maha Aarti Seva Contribution': 'Be part of the grand Janmashtami midnight aarti.',
+    'Maha Abhishek Seva Contribution': 'Contribute to the bathing ceremony of Sri Ladoo Gopal.',
+    'Janmashtami Donation Seva': 'Supports distribution of Gita/Bhagavatam (iskconbooks.in). 80G receipt issued later.',
+}
+
+def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address, mobile, reg_at=None):
     """Sends a branded HTML email receipt for the donation via the Brevo HTTP
     API. Fails gracefully if BREVO_API_KEY is not configured."""
     api_key = os.environ.get('BREVO_API_KEY')
     from_email = os.environ.get('MAIL_USERNAME', 'iskconbooks.in@gmail.com')
+    reg_at = reg_at or ist_now().strftime('%d/%m/%Y %H:%M')
 
     if not api_key:
         log.warning(f"BREVO_API_KEY is not configured. Skipping email receipt to {to_email} for donation {ref_id}.")
         return False
 
     try:
-        # Details text formatting
+        # Details text formatting -- each seva gets its amount plus a short
+        # purpose line so the receipt says what the contribution is for.
         details_html = ""
         for title, amt in detail_bits.items():
             if amt > 0:
+                purpose = _SEVA_PURPOSE.get(title, '')
                 details_html += f"""
                 <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eeeeee; color: #333333;">{title}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eeeeee; text-align: right; font-weight: bold; color: #111111;">₹{amt:,}</td>
+                    <td style="padding: 12px 10px 4px; color: #111111; font-weight: 600;">{title}</td>
+                    <td style="padding: 12px 10px 4px; text-align: right; font-weight: bold; color: #111111;">₹{amt:,}</td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="padding: 0 10px 10px; border-bottom: 1px solid #eeeeee; color: #888888; font-size: 12px; line-height: 1.4;">{purpose}</td>
                 </tr>
                 """
-        
+
         # HTML body with peacock-feather inspired colors (dark blue and gold accent)
         html = f"""
         <html>
@@ -1470,16 +1485,24 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                 <!-- Header -->
                 <tr>
                     <td align="center" style="background: linear-gradient(135deg, #0B132B 0%, #1A2E40 100%); padding: 30px 20px; border-bottom: 3px solid #F59E0B;">
-                        <h1 style="color: #F59E0B; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px;">ISKCON CHANDKHEDA</h1>
-                        <p style="color: #00E5FF; margin: 5px 0 0; font-size: 14px; text-transform: uppercase; font-weight: 600; letter-spacing: 2px;">Hare Krishna Land</p>
+                        <h1 style="color: #F59E0B; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px;">ISKCON CHANDKHEDA CENTER</h1>
+                        <p style="color: #00E5FF; margin: 5px 0 0; font-size: 14px; text-transform: uppercase; font-weight: 600; letter-spacing: 2px;">Sri Krishna Janmashtami Mahotsav 2026</p>
+                    </td>
+                </tr>
+                <!-- Confirmation badge -->
+                <tr>
+                    <td align="center" style="padding: 24px 24px 0;">
+                        <div style="display: inline-block; background: #ecfdf5; border: 2px solid #16a34a; border-radius: 50px; padding: 6px 20px;">
+                            <span style="color: #16a34a; font-weight: bold; font-size: 14px;">&#9989; Donation Confirmed</span>
+                        </div>
                     </td>
                 </tr>
                 <!-- Body -->
                 <tr>
-                    <td style="padding: 30px 25px;">
+                    <td style="padding: 20px 25px 30px;">
                         <p style="font-size: 16px; color: #333333; line-height: 1.6; margin-top: 0;">Dear <strong>{name}</strong>,</p>
                         <p style="font-size: 15px; color: #555555; line-height: 1.6;">Hare Krishna! Thank you very much for your generous seva offering for Sri Krishna Janmashtami. Lord Sri Krishna will surely bless you and your family for your devotion.</p>
-                        
+
                         <div style="background-color: #f9fbfd; border-radius: 8px; border: 1px solid #eef2f5; padding: 15px; margin: 20px 0;">
                             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px;">
                                 <tr>
@@ -1487,8 +1510,8 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                                     <td style="font-weight: bold; text-align: right; color: #333333; padding-bottom: 8px;">{ref_id}</td>
                                 </tr>
                                 <tr>
-                                    <td style="color: #777777; padding-bottom: 8px;">Date:</td>
-                                    <td style="text-align: right; color: #333333; padding-bottom: 8px;">{datetime.now().strftime('%d/%m/%Y')}</td>
+                                    <td style="color: #777777; padding-bottom: 8px;">Date &amp; Time:</td>
+                                    <td style="text-align: right; color: #333333; padding-bottom: 8px;">{reg_at}</td>
                                 </tr>
                                 <tr>
                                     <td style="color: #777777; padding-bottom: 8px;">Donor Name:</td>
@@ -1504,8 +1527,8 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                                 </tr>
                             </table>
                         </div>
-                        
-                        <h3 style="font-size: 16px; color: #111111; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; margin-top: 25px;">Contribution Details</h3>
+
+                        <h3 style="font-size: 16px; color: #111111; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; margin-top: 25px;">Contribution Details &amp; Purpose</h3>
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 15px; margin-bottom: 15px;">
                             {details_html}
                             <tr style="background-color: #fffdf5;">
@@ -1513,7 +1536,7 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                                 <td style="padding: 12px 10px; text-align: right; font-weight: bold; color: #D97706; font-size: 18px;">₹{total_paid:,}</td>
                             </tr>
                         </table>
-                        
+
                         <p style="font-size: 13px; color: #777777; line-height: 1.5; margin-top: 25px;">
                             This is an automated receipt for your digital donation through <a href="http://iskconbooks.in" style="color: #0072FF; text-decoration: none; font-weight: 500;">iskconbooks.in</a>. For any queries, please reply directly to this email or reach us on our WhatsApp number.
                         </p>
@@ -1521,17 +1544,20 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
                 </tr>
                 <!-- Footer -->
                 <tr>
-                    <td align="center" style="background-color: #f7fafc; padding: 20px; border-top: 1px solid #edf2f7; font-size: 12px; color: #7f8c8d; line-height: 1.5;">
-                        <strong>ISKCON Chandkheda Center</strong><br>
-                        Sant Shri Sadaram Bapa Community Hall, New CG Road, Chandkheda, Ahmedabad<br>
-                        Website: <a href="https://iskconbooks.in" style="color: #7f8c8d; text-decoration: underline;">iskconbooks.in</a>
+                    <td align="center" style="background-color: #1e3a5f; padding: 22px 24px; border-top: 3px solid #F59E0B;">
+                        <p style="margin: 0 0 10px; color: #93c5fd; font-size: 12px; letter-spacing: 1px;">Hare Krishna, Hare Krishna, Krishna Krishna, Hare Hare<br>Hare Rama, Hare Rama, Rama Rama, Hare Hare</p>
+                        <p style="margin: 10px 0 0; color: #cbd5e1; font-size: 12px; line-height: 1.6;">
+                            <strong style="color: #ffffff;">ISKCON Chandkheda Center</strong><br>
+                            Sant Shri Sadaram Bapa Community Hall, New CG Road, Chandkheda, Ahmedabad<br>
+                            <a href="https://iskconbooks.in" style="color: #93c5fd; text-decoration: underline;">iskconbooks.in</a>
+                        </p>
                     </td>
                 </tr>
             </table>
         </body>
         </html>
         """
-        
+
         payload = {
             'sender': {'name': 'ISKCON Chandkheda Center', 'email': from_email},
             'to': [{'email': to_email}],
@@ -1766,7 +1792,8 @@ def confirm_donation_checkout():
                 detail_bits=detail_bits,
                 ref_id=res_data.get('token', payment_id),
                 address=reg_data['address'],
-                mobile=reg_data['mobile']
+                mobile=reg_data['mobile'],
+                reg_at=res_data.get('reg_at'),
             )
 
     return res_json, status_code
@@ -1862,7 +1889,8 @@ def confirm_donation_payment_link():
                 detail_bits=detail_bits,
                 ref_id=res_data.get('token', payment_id),
                 address=reg_data['address'],
-                mobile=reg_data['mobile']
+                mobile=reg_data['mobile'],
+                reg_at=res_data.get('reg_at'),
             )
 
     return res_json, status_code
