@@ -1743,7 +1743,7 @@ def confirm_donation_checkout():
             detail_bits = {
                 'Maha Aarti Seva Contribution': aarti_amount,
                 'Maha Abhishek Seva Contribution': abhishek_amount,
-                'General Donation / Book Distribution': donation_amount
+                'Janmashtami Donation Seva': donation_amount
             }
             send_receipt_email_async(
                 to_email=donor_email,
@@ -1754,7 +1754,7 @@ def confirm_donation_checkout():
                 address=reg_data['address'],
                 mobile=reg_data['mobile']
             )
-            
+
     return res_json, status_code
 
 @app.route('/api/donation/payment-link-complete', methods=['POST'])
@@ -1839,7 +1839,7 @@ def confirm_donation_payment_link():
             detail_bits = {
                 'Maha Aarti Seva Contribution': aarti_amount,
                 'Maha Abhishek Seva Contribution': abhishek_amount,
-                'General Donation / Book Distribution': donation_amount
+                'Janmashtami Donation Seva': donation_amount
             }
             send_receipt_email_async(
                 to_email=donor_email,
