@@ -1092,6 +1092,7 @@
                 <option value="">All Categories</option>
                 <option value="volunteer">Volunteer-Registered</option>
                 <option value="online">Online (Self)</option>
+                <option value="donate">Donation Only</option>
               </select>
               <select id="reg-registered-by-filter" class="form-control" style="width: 190px; font-size: 0.85rem;" onchange="filterRegistrationsTable()">
                 <option value="">All Registered By</option>
@@ -2930,7 +2931,7 @@
         const data = await res.json();
         allRegistrationsByToken = Object.fromEntries(data.registrations.map(r => [r.token, r]));
         const tbody = document.getElementById('registrations-table-body');
-        const registeredByLabel = r => r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : 'System');
+        const registeredByLabel = r => r.registered_by_name || (r.category === 'online' ? 'Self-Registered' : (r.category === 'donate' ? 'Online Donor' : 'System'));
         tbody.innerHTML = data.registrations.map(r => `
           <tr data-category="${r.category || 'volunteer'}" data-registered-by="${registeredByLabel(r).replace(/"/g, '&quot;')}">
             <td><strong style="color: var(--accent-gold-light);">${r.token}</strong></td>
@@ -2939,7 +2940,7 @@
             <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.address}</td>
             <td>${r.persons}</td>
             <td>${paidCellHtml(r)}</td>
-            <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>'}</td>
+            <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : (r.category === 'donate' ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.35);"><i class="fa-solid fa-hand-holding-heart"></i> Donation</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>')}</td>
             <td>${registeredByLabel(r)}</td>
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}

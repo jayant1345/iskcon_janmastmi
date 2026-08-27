@@ -691,7 +691,11 @@ def create_settlement():
 def get_stats():
     try:
         reg_row = db_query("""
-            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons, COALESCE(SUM(paid),0) AS collection,
+            SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons
+            FROM registrations WHERE category != 'donate'
+        """, fetch='one')
+        fin_row = db_query("""
+            SELECT COALESCE(SUM(paid),0) AS collection,
                    COALESCE(SUM(token_amount),0) AS token_total, COALESCE(SUM(aarti_amount),0) AS aarti_total,
                    COALESCE(SUM(abhishek_amount),0) AS abhishek_total, COALESCE(SUM(donation_amount),0) AS donation_total
             FROM registrations
@@ -702,7 +706,7 @@ def get_stats():
         )
         today_row = db_query("""
             SELECT COUNT(*) AS families, COALESCE(SUM(persons),0) AS persons
-            FROM registrations WHERE DATE(reg_at) = CURDATE()
+            FROM registrations WHERE DATE(reg_at) = CURDATE() AND category != 'donate'
         """, fetch='one')
         result = {
             'registered_families': reg_row['families'],
@@ -714,11 +718,11 @@ def get_stats():
             'today_persons':       int(today_row['persons']),
         }
         if session.get('role') == 'admin':
-            result['collection'] = int(reg_row['collection'])
-            result['token_total'] = int(reg_row['token_total'])
-            result['aarti_total'] = int(reg_row['aarti_total'])
-            result['abhishek_total'] = int(reg_row['abhishek_total'])
-            result['donation_total'] = int(reg_row['donation_total'])
+            result['collection'] = int(fin_row['collection'])
+            result['token_total'] = int(fin_row['token_total'])
+            result['aarti_total'] = int(fin_row['aarti_total'])
+            result['abhishek_total'] = int(fin_row['abhishek_total'])
+            result['donation_total'] = int(fin_row['donation_total'])
         return jsonify(result)
     except Exception as e:
         log.error(f'stats error: {e}')
@@ -924,7 +928,7 @@ def _create_registration(data, registered_by, category):
     # Token/entry amount is never trusted from the client -- it's always persons x the
     # admin-configured rate, so the charge can't be tampered with in the request body.
     rate = get_settings_row()['token_rate']
-    token_amount = 0 if free_entry else persons * rate
+    token_amount = 0 if (free_entry or category == 'donate') else persons * rate
     if free_entry:
         payment_mode = 'free'
     # Online self-registrations aren't collected at the counter yet -- payment is settled
@@ -942,7 +946,7 @@ def _create_registration(data, registered_by, category):
                 cur.execute("UPDATE token_counter SET current = current + 1 WHERE id = %s", (counter_id,))
                 cur.execute("SELECT current FROM token_counter WHERE id = %s", (counter_id,))
                 tok_num = cur.fetchone()['current']
-                token = str(tok_num)
+                token = ('D' + str(tok_num)) if category == 'donate' else str(tok_num)
 
                 cur.execute("""
                     INSERT INTO registrations
@@ -1395,6 +1399,459 @@ def register_public():
     data['abhishek_amount'] = abhishek_amount
     data['donation_amount'] = 0
     return _create_registration(data, registered_by=None, category='online')
+
+# ============================================================
+#  EMAIL RECEIPT & SMTP HELPERS
+# ============================================================
+import threading
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address, mobile):
+    """Sends a beautiful HTML email receipt for the donation using SMTP settings
+    from environment variables. Fails gracefully if SMTP is not configured."""
+    smtp_server = os.environ.get('SMTP_SERVER')
+    smtp_port = os.environ.get('SMTP_PORT')
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_password = os.environ.get('SMTP_PASSWORD')
+    smtp_from_email = os.environ.get('SMTP_FROM_EMAIL', smtp_user)
+    
+    if not (smtp_server and smtp_port and smtp_user and smtp_password):
+        log.warning(f"SMTP is not fully configured (SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD missing). "
+                    f"Skipping email receipt to {to_email} for donation {ref_id}.")
+        return False
+        
+    try:
+        # Create message container
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Donation Receipt - ISKCON Chandkheda Center - Ref {ref_id}"
+        msg['From'] = f"ISKCON Chandkheda Center <{smtp_from_email}>"
+        msg['To'] = to_email
+        
+        # Details text formatting
+        details_html = ""
+        for title, amt in detail_bits.items():
+            if amt > 0:
+                details_html += f"""
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eeeeee; color: #333333;">{title}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eeeeee; text-align: right; font-weight: bold; color: #111111;">₹{amt:,}</td>
+                </tr>
+                """
+        
+        # HTML body with peacock-feather inspired colors (dark blue and gold accent)
+        html = f"""
+        <html>
+        <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
+                <!-- Header -->
+                <tr>
+                    <td align="center" style="background: linear-gradient(135deg, #0B132B 0%, #1A2E40 100%); padding: 30px 20px; border-bottom: 3px solid #F59E0B;">
+                        <h1 style="color: #F59E0B; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px;">ISKCON CHANDKHEDA</h1>
+                        <p style="color: #00E5FF; margin: 5px 0 0; font-size: 14px; text-transform: uppercase; font-weight: 600; letter-spacing: 2px;">Hare Krishna Land</p>
+                    </td>
+                </tr>
+                <!-- Body -->
+                <tr>
+                    <td style="padding: 30px 25px;">
+                        <p style="font-size: 16px; color: #333333; line-height: 1.6; margin-top: 0;">Dear <strong>{name}</strong>,</p>
+                        <p style="font-size: 15px; color: #555555; line-height: 1.6;">Hare Krishna! Thank you very much for your generous seva offering for Sri Krishna Janmashtami. Lord Sri Krishna will surely bless you and your family for your devotion.</p>
+                        
+                        <div style="background-color: #f9fbfd; border-radius: 8px; border: 1px solid #eef2f5; padding: 15px; margin: 20px 0;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px;">
+                                <tr>
+                                    <td style="color: #777777; padding-bottom: 8px;">Receipt Ref:</td>
+                                    <td style="font-weight: bold; text-align: right; color: #333333; padding-bottom: 8px;">{ref_id}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777777; padding-bottom: 8px;">Date:</td>
+                                    <td style="text-align: right; color: #333333; padding-bottom: 8px;">{datetime.now().strftime('%d/%m/%Y')}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777777; padding-bottom: 8px;">Donor Name:</td>
+                                    <td style="text-align: right; color: #333333; padding-bottom: 8px;">{name}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777777; padding-bottom: 8px;">WhatsApp:</td>
+                                    <td style="text-align: right; color: #333333; padding-bottom: 8px;">{mobile}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777777; vertical-align: top;">Address:</td>
+                                    <td style="text-align: right; color: #333333; max-width: 250px;">{address}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <h3 style="font-size: 16px; color: #111111; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; margin-top: 25px;">Contribution Details</h3>
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 15px; margin-bottom: 15px;">
+                            {details_html}
+                            <tr style="background-color: #fffdf5;">
+                                <td style="padding: 12px 10px; font-weight: bold; color: #111111; font-size: 16px;">Total Contributed</td>
+                                <td style="padding: 12px 10px; text-align: right; font-weight: bold; color: #D97706; font-size: 18px;">₹{total_paid:,}</td>
+                            </tr>
+                        </table>
+                        
+                        <p style="font-size: 13px; color: #777777; line-height: 1.5; margin-top: 25px;">
+                            This is an automated receipt for your digital donation through <a href="http://iskconbooks.in" style="color: #0072FF; text-decoration: none; font-weight: 500;">iskconbooks.in</a>. For any queries, please reply directly to this email or reach us on our WhatsApp number.
+                        </p>
+                    </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                    <td align="center" style="background-color: #f7fafc; padding: 20px; border-top: 1px solid #edf2f7; font-size: 12px; color: #7f8c8d; line-height: 1.5;">
+                        <strong>ISKCON Chandkheda Center</strong><br>
+                        Sant Shri Sadaram Bapa Community Hall, New CG Road, Chandkheda, Ahmedabad<br>
+                        Website: <a href="https://iskconbooks.in" style="color: #7f8c8d; text-decoration: underline;">iskconbooks.in</a>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html, 'html'))
+        
+        # Connect and send
+        port_num = int(smtp_port)
+        if port_num == 465:
+            server = smtplib.SMTP_SSL(smtp_server, port_num, timeout=10)
+        else:
+            server = smtplib.SMTP(smtp_server, port_num, timeout=10)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_from_email, to_email, msg.as_string())
+        server.quit()
+        log.info(f"Successfully sent receipt email to {to_email} for donation {ref_id}")
+        return True
+    except Exception as e:
+        log.error(f"Error sending email receipt to {to_email}: {e}\n{traceback.format_exc()}")
+        return False
+
+def send_receipt_email_async(to_email, name, total_paid, detail_bits, ref_id, address, mobile):
+    thread = threading.Thread(
+        target=send_receipt_email,
+        args=(to_email, name, total_paid, detail_bits, ref_id, address, mobile)
+    )
+    thread.daemon = True
+    thread.start()
+
+# ============================================================
+#  PUBLIC DONATION ROUTES
+# ============================================================
+@app.route('/donation')
+def serve_public_donation():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'donation.html', max_age=0)
+
+@app.route('/api/donation/config', methods=['GET'])
+def donation_config():
+    """Public, no-login -- exposes the payment settings for the donation page."""
+    mode = 'razorpay' if RAZORPAY_ENABLED else ('payment_link' if PAYMENT_LINK_ENABLED else 'pending')
+    return jsonify({
+        'mode': mode,
+        'razorpay_enabled': RAZORPAY_ENABLED,
+        'payment_link_enabled': PAYMENT_LINK_ENABLED,
+    })
+
+@app.route('/api/donation/order', methods=['POST'])
+def create_donation_order():
+    """Public, no-login -- creates a Razorpay order for the donation amount."""
+    if not RAZORPAY_ENABLED:
+        return jsonify({'error': 'Online donation is not available right now'}), 503
+
+    data = request.get_json() or {}
+    try:
+        aarti_val = max(0, int(data.get('aarti_amount', 0) or 0))
+        abhishek_val = max(0, int(data.get('abhishek_amount', 0) or 0))
+        general_val = max(0, int(data.get('donation_amount', 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Donation amounts must be whole numbers'}), 400
+
+    total_amount = aarti_val + abhishek_val + general_val
+    if total_amount <= 0:
+        return jsonify({'error': 'Donation amount must be greater than zero'}), 400
+
+    amount_paise = total_amount * 100
+
+    try:
+        order = razorpay_client.order.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'payment_capture': 1,
+            'notes': {
+                'event': 'ISKCON Chandkheda Janmashtami 2026 Donation',
+                'name': str(data.get('name', '')).strip()[:100],
+                'email': str(data.get('email', '')).strip()[:100],
+                'mobile': str(data.get('mobile', '')).strip()[:15],
+                'address': str(data.get('address', '')).strip()[:500],
+                'aarti_amount': aarti_val,
+                'abhishek_amount': abhishek_val,
+                'donation_amount': general_val,
+                'category': 'donate'
+            },
+        })
+        return jsonify({'order_id': order['id'], 'amount': amount_paise, 'currency': 'INR', 'key_id': RAZORPAY_KEY_ID})
+    except Exception as e:
+        log.error(f'razorpay donation order create error: {e}')
+        return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
+@app.route('/api/donation/payment-link', methods=['POST'])
+def create_donation_payment_link():
+    """Public, no-login -- creates a Razorpay Payment Link for donation."""
+    if not PAYMENT_LINK_ENABLED:
+        return jsonify({'error': 'Online payment is not available right now'}), 503
+
+    data = request.get_json() or {}
+    name = str(data.get('name', '')).strip()
+    mobile = str(data.get('mobile', '')).strip()
+    email = str(data.get('email', '')).strip()
+    address = str(data.get('address', '')).strip()
+
+    try:
+        aarti_val = max(0, int(data.get('aarti_amount', 0) or 0))
+        abhishek_val = max(0, int(data.get('abhishek_amount', 0) or 0))
+        general_val = max(0, int(data.get('donation_amount', 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Donation amounts must be whole numbers'}), 400
+
+    if not name or not address or not mobile or not email:
+        return jsonify({'error': 'Name, address, email, and mobile number are required'}), 400
+    if not re.match(r'^\d{10}$', mobile):
+        return jsonify({'error': 'Mobile number must be 10 digits'}), 400
+
+    total_amount = aarti_val + abhishek_val + general_val
+    if total_amount <= 0:
+        return jsonify({'error': 'Donation amount must be greater than zero'}), 400
+
+    amount_paise = total_amount * 100
+
+    description = 'ISKCON Chandkheda Janmashtami 2026 Donation'
+    details = []
+    if aarti_val: details.append(f'Aarti: ₹{aarti_val}')
+    if abhishek_val: details.append(f'Abhishek: ₹{abhishek_val}')
+    if general_val: details.append(f'General: ₹{general_val}')
+    if details:
+        description += ' (' + ', '.join(details) + ')'
+
+    reference_id = secrets.token_hex(12)
+    callback_url = request.host_url.rstrip('/') + '/donation'
+
+    try:
+        link = razorpay_client.payment_link.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'accept_partial': False,
+            'description': description,
+            'customer': {'name': name[:100], 'contact': mobile, 'email': email},
+            'notify': {'sms': False, 'email': False},
+            'reminder_enable': False,
+            'reference_id': reference_id,
+            'callback_url': callback_url,
+            'callback_method': 'get',
+            'notes': {
+                'event': 'ISKCON Chandkheda Janmashtami 2026 Donation',
+                'name': name[:255],
+                'email': email[:255],
+                'mobile': mobile[:15],
+                'address': address[:500],
+                'aarti_amount': aarti_val,
+                'abhishek_amount': abhishek_val,
+                'donation_amount': general_val,
+                'category': 'donate'
+            },
+        })
+        return jsonify({'short_url': link['short_url'], 'id': link['id'], 'amount': amount_paise // 100})
+    except Exception as e:
+        log.error(f'razorpay donation payment_link create error: {e}')
+        return jsonify({'error': 'Could not initiate payment. Please try again.'}), 500
+
+@app.route('/api/donation/confirm', methods=['POST'])
+def confirm_donation_checkout():
+    """Public, no-login -- verifies Razorpay checkout payment and saves donation details."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not configured'}), 503
+
+    data = request.get_json() or {}
+    order_id   = str(data.get('razorpay_order_id', '')).strip()
+    payment_id = str(data.get('razorpay_payment_id', '')).strip()
+    signature  = str(data.get('razorpay_signature', '')).strip()
+    
+    if not order_id or not payment_id or not signature:
+        return jsonify({'error': 'Payment verification data missing'}), 400
+
+    try:
+        razorpay_client.utility.verify_payment_signature({
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature,
+        })
+    except razorpay.errors.SignatureVerificationError:
+        log.error(f'Razorpay signature verification failed for donation order {order_id}')
+        return jsonify({'error': 'Payment verification failed'}), 400
+
+    # Idempotent check
+    existing = db_query("SELECT * FROM registrations WHERE payment_ref=%s", (payment_id,), fetch='one')
+    if existing:
+        reg_at_str = existing['reg_at'].strftime('%d/%m/%Y %H:%M') if existing.get('reg_at') else ''
+        return jsonify({
+            'success': True, 'token': existing['token'], 'name': existing['name'],
+            'mobile': existing['mobile'], 'address': existing['address'],
+            'paid': existing['paid'], 'aarti_amount': existing['aarti_amount'],
+            'abhishek_amount': existing['abhishek_amount'], 'donation_amount': existing['donation_amount'],
+            'payment_mode': existing['payment_mode'], 'reg_at': reg_at_str,
+        }), 200
+
+    try:
+        order = razorpay_client.order.fetch(order_id)
+    except Exception as e:
+        log.error(f'razorpay order fetch error: {e}')
+        return jsonify({'error': 'Could not verify payment. Please contact support with your payment ID.'}), 500
+
+    order_notes = order.get('notes') or {}
+    aarti_amount = int(order_notes.get('aarti_amount', 0) or 0)
+    abhishek_amount = int(order_notes.get('abhishek_amount', 0) or 0)
+    donation_amount = int(order_notes.get('donation_amount', 0) or 0)
+    expected_amount = (aarti_amount + abhishek_amount + donation_amount) * 100
+
+    if order.get('status') != 'paid' or order.get('amount_paid') != expected_amount:
+        log.error(f'Razorpay amount/status mismatch: order={order} expected={expected_amount}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
+    reg_data = {
+        'name': str(order_notes.get('name', data.get('name', ''))).strip(),
+        'mobile': str(order_notes.get('mobile', data.get('mobile', ''))).strip(),
+        'address': str(order_notes.get('address', data.get('address', ''))).strip(),
+        'persons': 1,
+        'free_entry': False,
+        'payment_mode': 'razorpay',
+        'payment_ref': payment_id,
+        'aarti_amount': aarti_amount,
+        'abhishek_amount': abhishek_amount,
+        'donation_amount': donation_amount,
+    }
+
+    res_json, status_code = _create_registration(reg_data, registered_by=None, category='donate')
+    
+    # Send email receipt if payment creation succeeded
+    if status_code == 201:
+        res_data = res_json.json
+        donor_email = str(order_notes.get('email', data.get('email', ''))).strip()
+        if donor_email:
+            detail_bits = {
+                'Maha Aarti Seva Contribution': aarti_amount,
+                'Maha Abhishek Seva Contribution': abhishek_amount,
+                'General Donation / Book Distribution': donation_amount
+            }
+            send_receipt_email_async(
+                to_email=donor_email,
+                name=reg_data['name'],
+                total_paid=aarti_amount + abhishek_amount + donation_amount,
+                detail_bits=detail_bits,
+                ref_id=res_data.get('token', payment_id),
+                address=reg_data['address'],
+                mobile=reg_data['mobile']
+            )
+            
+    return res_json, status_code
+
+@app.route('/api/donation/payment-link-complete', methods=['POST'])
+def confirm_donation_payment_link():
+    """Public, no-login -- verifies Razorpay payment-link completion and saves donation details."""
+    if not razorpay_client:
+        return jsonify({'error': 'Online payment is not configured'}), 503
+
+    data = request.get_json() or {}
+    payment_id = str(data.get('razorpay_payment_id', '')).strip()
+    link_id = str(data.get('razorpay_payment_link_id', '')).strip()
+    link_ref = str(data.get('razorpay_payment_link_reference_id', '')).strip()
+    link_status = str(data.get('razorpay_payment_link_status', '')).strip()
+    signature = str(data.get('razorpay_signature', '')).strip()
+    
+    if not (payment_id and link_id and link_status and signature):
+        return jsonify({'error': 'Payment verification data missing'}), 400
+
+    try:
+        valid = razorpay_client.utility.verify_payment_link_signature({
+            'razorpay_payment_id': payment_id,
+            'payment_link_id': link_id,
+            'payment_link_reference_id': link_ref,
+            'payment_link_status': link_status,
+            'razorpay_signature': signature,
+        })
+        if not valid:
+            raise razorpay.errors.SignatureVerificationError('signature mismatch')
+    except razorpay.errors.SignatureVerificationError:
+        log.error(f'Razorpay payment-link signature verification failed for donation link {link_id}')
+        return jsonify({'error': 'Payment verification failed'}), 400
+
+    if link_status != 'paid':
+        return jsonify({'error': f'Payment was not completed (status: {link_status}).'}), 400
+
+    existing = db_query("SELECT * FROM registrations WHERE payment_ref=%s", (payment_id,), fetch='one')
+    if existing:
+        reg_at_str = existing['reg_at'].strftime('%d/%m/%Y %H:%M') if existing.get('reg_at') else ''
+        return jsonify({
+            'success': True, 'token': existing['token'], 'name': existing['name'],
+            'mobile': existing['mobile'], 'address': existing['address'],
+            'paid': existing['paid'], 'aarti_amount': existing['aarti_amount'],
+            'abhishek_amount': existing['abhishek_amount'], 'donation_amount': existing['donation_amount'],
+            'payment_mode': existing['payment_mode'], 'reg_at': reg_at_str,
+        }), 200
+
+    try:
+        link = razorpay_client.payment_link.fetch(link_id)
+    except Exception as e:
+        log.error(f'razorpay payment_link fetch error: {e}')
+        return jsonify({'error': 'Could not verify payment. Please contact support with your payment ID.'}), 500
+
+    if link.get('status') != 'paid' or link.get('amount_paid') != link.get('amount'):
+        log.error(f'Razorpay payment-link status/amount mismatch: {link}')
+        return jsonify({'error': 'Payment amount mismatch. Please contact support with your payment ID.'}), 400
+
+    notes = link.get('notes') or {}
+    aarti_amount = int(notes.get('aarti_amount', 0) or 0)
+    abhishek_amount = int(notes.get('abhishek_amount', 0) or 0)
+    donation_amount = int(notes.get('donation_amount', 0) or 0)
+
+    reg_data = {
+        'name': str(notes.get('name', '')).strip(),
+        'mobile': str(notes.get('mobile', '')).strip(),
+        'address': str(notes.get('address', '')).strip(),
+        'persons': 1,
+        'free_entry': False,
+        'payment_mode': 'razorpay',
+        'payment_ref': payment_id,
+        'aarti_amount': aarti_amount,
+        'abhishek_amount': abhishek_amount,
+        'donation_amount': donation_amount,
+    }
+
+    res_json, status_code = _create_registration(reg_data, registered_by=None, category='donate')
+    
+    # Send email receipt if payment creation succeeded
+    if status_code == 201:
+        res_data = res_json.json
+        donor_email = str(notes.get('email', '')).strip()
+        if donor_email:
+            detail_bits = {
+                'Maha Aarti Seva Contribution': aarti_amount,
+                'Maha Abhishek Seva Contribution': abhishek_amount,
+                'General Donation / Book Distribution': donation_amount
+            }
+            send_receipt_email_async(
+                to_email=donor_email,
+                name=reg_data['name'],
+                total_paid=aarti_amount + abhishek_amount + donation_amount,
+                detail_bits=detail_bits,
+                ref_id=res_data.get('token', payment_id),
+                address=reg_data['address'],
+                mobile=reg_data['mobile']
+            )
+
+    return res_json, status_code
 
 # ============================================================
 #  ATTENDANCE & GATE GATEWAY

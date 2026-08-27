@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪈 ISKCON Chandkheda Center — Janmashtami Seva Donation</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Yatra+One&family=Noto+Sans+Devanagari:wght@600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-dark: #070E1D;
+      --bg-card: rgba(11, 19, 41, 0.82);
+      --border-gold: rgba(245, 158, 11, 0.35);
+      --border-peacock: rgba(13, 148, 136, 0.35);
+      --accent-gold: #F59E0B;
+      --accent-gold-light: #FBBF24;
+      --accent-peacock: #00E5FF;
+      --accent-teal: #0D9488;
+      --grad-gold: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+      --grad-peacock: linear-gradient(135deg, #00E5FF 0%, #0D9488 50%, #1E1B4B 100%);
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --danger: #EF4444;
+      --glass-shadow: 0 20px 50px rgba(0, 229, 255, 0.08), 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Noto Serif', serif; }
+    
+    body {
+      background-color: var(--bg-dark);
+      background-image: linear-gradient(180deg, rgba(7, 14, 29, 0.75) 0%, rgba(3, 7, 18, 0.9) 100%), url('peacock_bg.jpg');
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .page-header { text-align: center; margin: 1.5rem 0 2.5rem; max-width: 700px; }
+    .page-header img { height: 72px; filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.7)); }
+    .page-header .header-devanagari {
+      font-family: 'Yatra One', 'Noto Sans Devanagari', sans-serif; font-weight: 800;
+      font-size: 2.2rem; line-height: 1.3; margin-top: 0.8rem;
+      background: var(--grad-gold); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .page-header h1 { font-size: 1.6rem; font-weight: 700; margin-top: 0.4rem; color: #FFFFFF; }
+    .page-header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.5rem; line-height: 1.6; }
+    .page-header p a { color: var(--accent-peacock); text-decoration: none; font-weight: 500; }
+    .page-header p a:hover { text-decoration: underline; }
+
+    .main-container {
+      display: flex;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1000px;
+      align-items: flex-start;
+    }
+
+    /* Left Side: Devotional Collage */
+    .media-collage {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      position: sticky;
+      top: 20px;
+    }
+    .collage-item {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border-peacock);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      aspect-ratio: 1 / 1;
+      transition: transform 0.4s ease, border-color 0.4s ease;
+    }
+    .collage-item:hover {
+      transform: translateY(-4px) scale(1.02);
+      border-color: var(--accent-gold);
+    }
+    .collage-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .collage-item .overlay-title {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(3, 13, 34, 0.9) 100%);
+      padding: 1rem 0.8rem 0.6rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #FFFFFF;
+      text-align: center;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .collage-item.span-2 {
+      grid-column: span 2;
+      aspect-ratio: 16 / 9;
+    }
+
+    /* Right Side: Donation Form */
+    .glass-card {
+      flex: 1.1;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-peacock);
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow: var(--glass-shadow);
+      width: 100%;
+      max-width: 520px;
+      position: relative;
+    }
+    
+    .glass-card-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(13, 148, 136, 0.2);
+      padding-bottom: 0.75rem;
+    }
+
+    .form-group { margin-bottom: 1.1rem; }
+    .form-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .form-control {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      background: rgba(3, 13, 34, 0.75);
+      border: 1px solid var(--border-peacock);
+      border-radius: 12px;
+      color: white;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+    .form-control:focus { outline: none; border-color: var(--accent-peacock); box-shadow: 0 0 15px rgba(0, 229, 255, 0.25); }
+    textarea.form-control { resize: none; height: 75px; }
+
+    /* Contribution Inputs */
+    .seva-input-group {
+      background: rgba(3, 13, 34, 0.45);
+      border: 1px solid var(--border-peacock);
+      border-radius: 16px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .seva-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(13, 148, 136, 0.15);
+    }
+    .seva-item:last-child { border-bottom: none; }
+    .seva-desc { flex: 1; }
+    .seva-title { font-size: 0.9rem; font-weight: 600; color: #FFFFFF; }
+    .seva-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+    
+    .seva-amount-wrapper {
+      position: relative;
+      width: 130px;
+    }
+    .seva-amount-wrapper span {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent-gold-light);
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .seva-amount-input {
+      width: 100%;
+      padding: 0.5rem 0.5rem 0.5rem 1.4rem;
+      background: rgba(3, 13, 34, 0.85);
+      border: 1px solid var(--border-peacock);
+      border-radius: 8px;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .seva-amount-input:focus { outline: none; border-color: var(--accent-gold); }
+    .seva-amount-input:disabled { opacity: 0.4; cursor: not-allowed; }
+    .seva-hint { font-size: 0.72rem; color: var(--text-muted); margin: -0.5rem 0 0.75rem; }
+
+    /* Checkbox Seva Rows (amount editable once checked -- shown price is a guide only) */
+    .seva-check-row {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.7rem 0.9rem; border: 1px solid var(--border-peacock); border-radius: 12px;
+      background: rgba(3, 13, 34, 0.55); margin-bottom: 0.55rem; cursor: pointer;
+    }
+    .seva-check-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-peacock); flex-shrink: 0; }
+    .seva-check-row .seva-check-title { flex: 1; font-size: 0.85rem; font-weight: 600; color: #FFFFFF; }
+    .seva-check-row .seva-amount-wrapper { width: 110px; }
+
+    /* Total Glow Box */
+    .total-box {
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid var(--border-peacock);
+      border-radius: 14px;
+      padding: 1rem;
+      margin: 1.25rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.03);
+    }
+    .total-box .total-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .total-box .total-amount { 
+      font-size: 1.5rem; 
+      font-weight: 800; 
+      color: var(--accent-gold-light);
+      font-family: 'JetBrains Mono', monospace;
+      text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+    }
+
+    .btn-donate {
+      background: var(--grad-gold);
+      color: #070E1D;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 0.9rem 1.8rem;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+    .btn-donate:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5);
+    }
+    .btn-donate:active { transform: translateY(0); }
+    .btn-donate:disabled { opacity: 0.65; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .note-box {
+      background: rgba(245, 158, 11, 0.06);
+      border: 1px solid var(--border-gold);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      font-size: 0.8rem;
+      color: var(--accent-gold-light);
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+    .error-box {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      font-size: 0.85rem;
+      color: #FCA5A5;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hidden { display: none !important; }
+
+    /* Printable Receipt Screen */
+    .receipt-container {
+      width: 100%;
+      text-align: center;
+    }
+    .receipt-icon {
+      font-size: 3.5rem;
+      color: #10B981;
+      margin-bottom: 1rem;
+      text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+    .receipt-card {
+      background: #FFFFFF;
+      color: #1E293B;
+      border-radius: 16px;
+      padding: 2rem;
+      margin: 1.5rem 0;
+      text-align: left;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+    .receipt-header {
+      text-align: center;
+      border-bottom: 2px dashed #CBD5E1;
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .receipt-header h3 { font-family: 'Outfit', sans-serif; font-size: 1.4rem; color: #0F172A; }
+    .receipt-header p { font-size: 0.8rem; color: #64748B; margin-top: 0.25rem; }
+    
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .receipt-row:last-child { border-bottom: none; }
+    .receipt-label { color: #64748B; font-weight: 500; }
+    .receipt-value { font-weight: 600; color: #0F172A; text-align: right; }
+    .receipt-value.mono { font-family: 'JetBrains Mono', monospace; }
+    .receipt-value.price { color: #D97706; font-size: 1.15rem; font-family: 'JetBrains Mono', monospace; }
+    
+    .receipt-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .btn-receipt {
+      flex: 1;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .btn-print { background: #334155; color: white; }
+    .btn-print:hover { background: #1E293B; }
+    .btn-back { background: var(--grad-gold); color: #070E1D; }
+    .btn-back:hover { opacity: 0.9; }
+
+    footer { margin-top: 3.5rem; color: var(--text-muted); font-size: 0.8rem; text-align: center; }
+    footer a { color: var(--accent-gold); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .main-container { flex-direction: column; align-items: center; }
+      .media-collage { order: 2; width: 100%; max-width: 520px; }
+      .glass-card { order: 1; max-width: 100%; }
+      .page-header .header-devanagari { font-size: 1.8rem; }
+      .page-header h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <img src="iskcon_logo_icon.png" alt="ISKCON Symbol">
+    <div class="header-devanagari">श्री कृष्ण जन्माष्टमी महोत्सव २०२६</div>
+    <h1>ISKCON Chandkheda Center</h1>
+    <p>Sant Shri Sadaram Bapa Community Hall, New CG Road, Chandkheda, Ahmedabad</p>
+    <p>Official Seva Booking & Devotional Offerings Portal · Powered by <a href="http://iskconbooks.in" target="_blank">iskconbooks.in</a></p>
+  </div>
+
+  <div class="main-container">
+    
+    <!-- LEFT SIDE: COLLAGE OF KRISHNA AARTI & ABHISHEK -->
+    <div class="media-collage" id="collage-container">
+      <div class="collage-item span-2">
+        <img src="iskcon_abhishek.jpg" alt="Maha Abhishek ceremony at ISKCON">
+        <div class="overlay-title">Maha Abhishek Seva Offering</div>
+      </div>
+      <div class="collage-item">
+        <img src="iskcon_deity.png" alt="Shree Krishna Deity Darshan">
+        <div class="overlay-title">Sri Sri Radha Govindaji Darshan</div>
+      </div>
+      <div class="collage-item">
+        <img src="iskcon_aarti.jpg" alt="Maha Aarti worship at ISKCON">
+        <div class="overlay-title">Janmashtami Divine Aarti</div>
+      </div>
+      <div class="collage-item span-2">
+        <img src="iskcon_general.jpg" alt="ISKCON Janmashtami celebration">
+        <div class="overlay-title">Janmashtami Mahotsav 2026</div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDE: FORM / RECEIPT VIEW -->
+    <div class="glass-card">
+      
+      <!-- LOADING OVERLAY -->
+      <div id="loading-overlay" class="hidden" style="text-align: center; padding: 2rem 0;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 3rem; color: var(--accent-peacock); margin-bottom: 1.5rem;"></i>
+        <h3 style="color: white; font-size: 1.2rem; font-weight: 600;">Verifying Payment...</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">Please do not close this window or refresh the page.</p>
+      </div>
+
+      <!-- DONATION FORM -->
+      <form id="donation-form">
+        <div class="glass-card-title">
+          <i class="fa-solid fa-hand-holding-heart"></i>
+          <span>Be part of the Maha Aarti & Abhishek</span>
+        </div>
+
+        <div class="note-box">
+          <i class="fa-solid fa-circle-info"></i>
+          Donations are secured via Razorpay. Your receipt will be instantly emailed to your mailbox and displayed on-screen.
+        </div>
+
+        <div class="error-box hidden" id="form-error">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="error-message"></span>
+        </div>
+
+        <!-- Donor Information -->
+        <div class="form-group">
+          <label class="form-label">Full Name of Donor</label>
+          <input type="text" id="donor-name" class="form-control" placeholder="e.g. Rajesh Kumar" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address (for receipt)</label>
+          <input type="email" id="donor-email" class="form-control" placeholder="e.g. rajesh@gmail.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">WhatsApp Mobile Number</label>
+          <input type="tel" id="donor-mobile" class="form-control" placeholder="10-digit number" maxlength="10" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Home Address</label>
+          <textarea id="donor-address" class="form-control" placeholder="Full residential address" required></textarea>
+        </div>
+
+        <!-- Seva Offerings -->
+        <label class="form-label" style="margin-top: 1.5rem;">Optional Sevas</label>
+        <div class="seva-hint">Select a Seva and edit its amount if you wish — every ₹ shown is only a suggested guide, not a fixed price.</div>
+
+        <label class="seva-check-row">
+          <input type="checkbox" id="chk-aarti" onchange="onAartiCheckChange()">
+          <span class="seva-check-title">Aarti Seva with family</span>
+          <span class="seva-amount-wrapper">
+            <span>₹</span>
+            <input type="number" id="amt-aarti" class="seva-amount-input" min="0" value="0" disabled oninput="updateLiveTotal()">
+          </span>
+        </label>
+
+        <label class="seva-check-row">
+          <input type="checkbox" class="abhishek-tier-donate" data-amount="1100" onchange="onAbhishekTierChangeDonate(this)">
+          <span class="seva-check-title">Abhishek Seva with family</span>
+          <span class="seva-amount-wrapper">
+            <span>₹</span>
+            <input type="number" class="seva-amount-input abhishek-tier-amt" min="0" value="0" disabled oninput="onAbhishekAmountEdited()">
+          </span>
+        </label>
+
+        <label class="seva-check-row">
+          <input type="checkbox" class="abhishek-tier-donate" data-amount="2500" onchange="onAbhishekTierChangeDonate(this)">
+          <span class="seva-check-title">Silver Kalash Abhishek Seva with family</span>
+          <span class="seva-amount-wrapper">
+            <span>₹</span>
+            <input type="number" class="seva-amount-input abhishek-tier-amt" min="0" value="0" disabled oninput="onAbhishekAmountEdited()">
+          </span>
+        </label>
+
+        <label class="seva-check-row">
+          <input type="checkbox" class="abhishek-tier-donate" data-amount="5001" onchange="onAbhishekTierChangeDonate(this)">
+          <span class="seva-check-title">Golden Kalash Abhishek Seva with family</span>
+          <span class="seva-amount-wrapper">
+            <span>₹</span>
+            <input type="number" class="seva-amount-input abhishek-tier-amt" min="0" value="0" disabled oninput="onAbhishekAmountEdited()">
+          </span>
+        </label>
+        <input type="hidden" id="amt-abhishek" value="0">
+
+        <div class="seva-input-group" style="margin-top: 1rem;">
+          <div class="seva-item">
+            <div class="seva-desc">
+              <div class="seva-title">Book Distribution & General Seva</div>
+              <div class="seva-note">Support distribution of Gita/Bhagavatam (iskconbooks.in). 80G Receipt Issued Later.</div>
+            </div>
+            <div class="seva-amount-wrapper">
+              <span>₹</span>
+              <input type="number" id="amt-general" class="seva-amount-input" min="0" placeholder="0" oninput="updateLiveTotal()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Total Display -->
+        <div class="total-box">
+          <span class="total-label">Total Contribution</span>
+          <span class="total-amount" id="total-display">₹0</span>
+        </div>
+
+        <button type="submit" class="btn-donate" id="submit-btn">
+          <i class="fa-solid fa-heart"></i> Offer Devotion
+        </button>
+      </form>
+
+      <!-- SUCCESS RECEIPT VIEW -->
+      <div id="receipt-view" class="receipt-container hidden">
+        <i class="fa-solid fa-circle-check receipt-icon"></i>
+        <h2 style="color: white; font-size: 1.5rem; margin-bottom: 0.5rem; font-family: 'Outfit', sans-serif;">Danam Accepted!</h2>
+        <p style="color: var(--accent-peacock); font-size: 0.9rem; font-weight: 500;">Thank you for your valuable contribution.</p>
+        
+        <div class="receipt-card" id="receipt-card-area">
+          <div class="receipt-header">
+            <h3>ISKCON Chandkheda Center</h3>
+            <p>Sant Shri Sadaram Bapa Community Hall, New CG Road, Ahmedabad</p>
+            <p style="font-weight: 600; color: #0D9488; margin-top: 5px;">Seva Receipt · Janmashtami 2026</p>
+          </div>
+          
+          <div class="receipt-row">
+            <span class="receipt-label">Receipt Number</span>
+            <span class="receipt-value mono" id="rec-token">-</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Date & Time</span>
+            <span class="receipt-value" id="rec-date">-</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Donor Name</span>
+            <span class="receipt-value" id="rec-name">-</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">WhatsApp Mobile</span>
+            <span class="receipt-value" id="rec-mobile">-</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Home Address</span>
+            <span class="receipt-value" id="rec-address">-</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Aarti Seva</span>
+            <span class="receipt-value mono" id="rec-aarti">₹0</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Abhishek Seva</span>
+            <span class="receipt-value mono" id="rec-abhishek">₹0</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">General & Books</span>
+            <span class="receipt-value mono" id="rec-general">₹0</span>
+          </div>
+          <div class="receipt-row" style="background-color: #F8FAFC; border-top: 1.5px solid #CBD5E1; padding: 8px 0; margin-top: 8px;">
+            <span class="receipt-label" style="font-weight: 700; color: #0F172A;">Total Donated</span>
+            <span class="receipt-value price" id="rec-total">₹0</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Payment ID</span>
+            <span class="receipt-value mono" id="rec-pay-ref" style="font-size: 0.8rem;">-</span>
+          </div>
+          
+          <p style="font-size: 0.72rem; color: #64748B; margin-top: 1.25rem; text-align: center; border-top: 1px dashed #E2E8F0; padding-top: 0.75rem; line-height: 1.4;">
+            This is an official donation record from ISKCON Chandkheda Center. A digital copy is sent to your email. Thank you for supporting book distribution at <strong>iskconbooks.in</strong>.
+          </p>
+        </div>
+
+        <div class="receipt-actions">
+          <button class="btn-receipt btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Print Receipt
+          </button>
+          <button class="btn-receipt btn-back" onclick="resetForm()">
+            <i class="fa-solid fa-rotate-left"></i> Donate Again
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <footer>
+    <p>© 2026 ISKCON Society · Chandkheda Center · All Rights Reserved</p>
+    <p>Powered by <a href="http://iskconbooks.in" target="_blank">iskconbooks.in</a></p>
+  </footer>
+
+  <script>
+    let paymentMode = 'pending'; // 'pending' | 'razorpay' | 'payment_link'
+    let rzpCheckoutPromise = null;
+
+    // Load Razorpay Script lazily for checkout
+    function loadRazorpayScript() {
+      if (rzpCheckoutPromise) return rzpCheckoutPromise;
+      rzpCheckoutPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve(true);
+        script.onerror = () => reject(new Error('Razorpay load error'));
+        document.head.appendChild(script);
+      });
+      return rzpCheckoutPromise;
+    }
+
+    // Update the live sum counter
+    function updateLiveTotal() {
+      const aarti = Math.max(0, parseInt(document.getElementById('amt-aarti').value) || 0);
+      const abhishek = Math.max(0, parseInt(document.getElementById('amt-abhishek').value) || 0);
+      const general = Math.max(0, parseInt(document.getElementById('amt-general').value) || 0);
+
+      const total = aarti + abhishek + general;
+      document.getElementById('total-display').innerText = `₹${total.toLocaleString('en-IN')}`;
+      return total;
+    }
+
+    // The ₹ next to each Seva checkbox is only a suggested amount to guide the
+    // donor -- checking the box unlocks the field so any custom amount can be
+    // typed in; unchecking excludes it from the total entirely.
+    function onAartiCheckChange() {
+      const chk = document.getElementById('chk-aarti');
+      const input = document.getElementById('amt-aarti');
+      if (chk.checked) {
+        input.disabled = false;
+        input.value = input.dataset.lastValue || 500;
+      } else {
+        input.dataset.lastValue = input.value || '';
+        input.disabled = true;
+        input.value = 0;
+      }
+      updateLiveTotal();
+    }
+
+    // Abhishek tiers are mutually exclusive (like the volunteer registration
+    // form) -- selecting one deselects the others, but the chosen tier's
+    // amount can still be edited to any value once checked.
+    function onAbhishekTierChangeDonate(cb) {
+      document.querySelectorAll('.abhishek-tier-donate').forEach(other => {
+        if (other === cb) return;
+        const otherInput = other.closest('.seva-check-row').querySelector('.abhishek-tier-amt');
+        if (other.checked) {
+          otherInput.dataset.lastValue = otherInput.value || '';
+        }
+        other.checked = false;
+        otherInput.disabled = true;
+        otherInput.value = 0;
+      });
+      const myInput = cb.closest('.seva-check-row').querySelector('.abhishek-tier-amt');
+      if (cb.checked) {
+        myInput.disabled = false;
+        myInput.value = myInput.dataset.lastValue || cb.dataset.amount;
+      } else {
+        myInput.dataset.lastValue = myInput.value || '';
+        myInput.disabled = true;
+        myInput.value = 0;
+      }
+      onAbhishekAmountEdited();
+    }
+
+    function onAbhishekAmountEdited() {
+      let total = 0;
+      document.querySelectorAll('.abhishek-tier-amt').forEach(inp => {
+        total += Math.max(0, parseInt(inp.value) || 0);
+      });
+      document.getElementById('amt-abhishek').value = total;
+      updateLiveTotal();
+    }
+
+    // Display error messages
+    function showError(msg) {
+      const errorBox = document.getElementById('form-error');
+      const errorMsg = document.getElementById('error-message');
+      if (msg) {
+        errorMsg.innerText = msg;
+        errorBox.classList.remove('hidden');
+        document.getElementById('submit-btn').scrollIntoView({ behavior: 'smooth' });
+      } else {
+        errorBox.classList.add('hidden');
+      }
+    }
+
+    // Set submit button loading/enabled states
+    function setBtnLoading(loading, text = 'Processing...') {
+      const btn = document.getElementById('submit-btn');
+      if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${text}`;
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-heart"></i> Offer Devotion`;
+      }
+    }
+
+    // Handle initial loading and payment link callbacks
+    window.addEventListener('DOMContentLoaded', async () => {
+      // 1. Fetch Config
+      try {
+        const configRes = await fetch('/api/donation/config');
+        if (configRes.ok) {
+          const config = await configRes.json();
+          paymentMode = config.mode;
+          if (paymentMode === 'razorpay') {
+            loadRazorpayScript().catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load donation settings', err);
+      }
+
+      // 2. Check for redirect back from Payment Link callback
+      const params = new URLSearchParams(window.location.search);
+      const paymentId = params.get('razorpay_payment_id');
+      const linkId = params.get('razorpay_payment_link_id');
+      const status = params.get('razorpay_payment_link_status');
+      
+      if (paymentId && linkId && status === 'paid') {
+        // Toggle view
+        document.getElementById('donation-form').classList.add('hidden');
+        document.getElementById('collage-container').classList.add('hidden');
+        document.getElementById('loading-overlay').classList.remove('hidden');
+
+        try {
+          const verifyRes = await fetch('/api/donation/payment-link-complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id: paymentId,
+              razorpay_payment_link_id: linkId,
+              razorpay_payment_link_reference_id: params.get('razorpay_payment_link_reference_id'),
+              razorpay_payment_link_status: status,
+              razorpay_signature: params.get('razorpay_signature'),
+            })
+          });
+          const result = await verifyRes.json();
+          document.getElementById('loading-overlay').classList.add('hidden');
+          
+          if (verifyRes.ok) {
+            showSuccessReceipt(result);
+          } else {
+            showError(result.error || 'Payment verification failed. Please contact us with your Payment ID: ' + paymentId);
+            document.getElementById('donation-form').classList.remove('hidden');
+            document.getElementById('collage-container').classList.remove('hidden');
+          }
+        } catch (err) {
+          console.error(err);
+          document.getElementById('loading-overlay').classList.add('hidden');
+          showError('Payment verification failed due to network error. Payment ID: ' + paymentId);
+          document.getElementById('donation-form').classList.remove('hidden');
+          document.getElementById('collage-container').classList.remove('hidden');
+        }
+      }
+    });
+
+    // Form Submission Handler
+    document.getElementById('donation-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError(null);
+
+      // Extract details
+      const name = document.getElementById('donor-name').value.trim();
+      const email = document.getElementById('donor-email').value.trim();
+      const mobile = document.getElementById('donor-mobile').value.trim();
+      const address = document.getElementById('donor-address').value.trim();
+
+      const aarti_amount = Math.max(0, parseInt(document.getElementById('amt-aarti').value) || 0);
+      const abhishek_amount = Math.max(0, parseInt(document.getElementById('amt-abhishek').value) || 0);
+      const donation_amount = Math.max(0, parseInt(document.getElementById('amt-general').value) || 0);
+
+      if (!/^\d{10}$/.test(mobile)) {
+        showError('WhatsApp number must be exactly 10 digits.');
+        return;
+      }
+      if (aarti_amount + abhishek_amount + donation_amount <= 0) {
+        showError('Please enter a contribution amount for at least one Seva category.');
+        return;
+      }
+
+      const payload = { name, email, mobile, address, aarti_amount, abhishek_amount, donation_amount };
+
+      // Handle based on paymentMode config
+      if (paymentMode === 'razorpay') {
+        runRazorpayCheckout(payload);
+      } else if (paymentMode === 'payment_link') {
+        runRazorpayPaymentLink(payload);
+      } else {
+        // Safe fall back if Razorpay is not configured (registers/saves as 'pending' cash/upi donation)
+        showError('Online payment is not active. Please contact the temple directly to settle offerings.');
+      }
+    });
+
+    // Option 1: Embedded Checkout Popup Flow
+    async function runRazorpayCheckout(payload) {
+      setBtnLoading(true, 'Initiating payment...');
+      try {
+        await loadRazorpayScript();
+        
+        // 1. Create order ID
+        const orderRes = await fetch('/api/donation/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) {
+          showError(orderData.error || 'Failed to create payment order.');
+          setBtnLoading(false);
+          return;
+        }
+
+        // 2. Open Razorpay Popup
+        const options = {
+          key: orderData.key_id,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          order_id: orderData.order_id,
+          name: 'ISKCON Chandkheda Center',
+          description: 'Sri Krishna Janmashtami Devotional Donation',
+          image: 'iskcon_logo_icon.png',
+          prefill: {
+            name: payload.name,
+            email: payload.email,
+            contact: payload.mobile
+          },
+          theme: { color: '#0D9488' },
+          handler: async function (response) {
+            setBtnLoading(true, 'Recording contribution...');
+            try {
+              const confirmRes = await fetch('/api/donation/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...payload,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature
+                })
+              });
+              const confirmData = await confirmRes.json();
+              if (confirmRes.ok) {
+                showSuccessReceipt(confirmData);
+              } else {
+                showError((confirmData.error || 'Verification failed.') + ' Payment ID: ' + response.razorpay_payment_id);
+                setBtnLoading(false);
+              }
+            } catch (err) {
+              showError('Payment succeeded but transaction could not be recorded. Save Payment ID: ' + response.razorpay_payment_id + ' & contact us.');
+              setBtnLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: function() {
+              setBtnLoading(false);
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        showError('Could not launch payment checkout. Please check internet connection.');
+        setBtnLoading(false);
+      }
+    }
+
+    // Option 2: Payment Link Redirect Flow
+    async function runRazorpayPaymentLink(payload) {
+      setBtnLoading(true, 'Creating payment link...');
+      try {
+        const linkRes = await fetch('/api/donation/payment-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const linkData = await linkRes.json();
+        if (linkRes.ok && linkData.short_url) {
+          window.location.href = linkData.short_url;
+        } else {
+          showError(linkData.error || 'Failed to generate donation payment link.');
+          setBtnLoading(false);
+        }
+      } catch (err) {
+        showError('Failed to connect to server. Check connectivity.');
+        setBtnLoading(false);
+      }
+    }
+
+    // Show Success Receipt Page
+    function showSuccessReceipt(data) {
+      document.getElementById('donation-form').classList.add('hidden');
+      document.getElementById('collage-container').classList.add('hidden');
+      document.getElementById('receipt-view').classList.remove('hidden');
+
+      document.getElementById('rec-token').innerText = data.token || '-';
+      document.getElementById('rec-date').innerText = data.reg_at || '-';
+      document.getElementById('rec-name').innerText = data.name || '-';
+      document.getElementById('rec-mobile').innerText = data.mobile || '-';
+      document.getElementById('rec-address').innerText = data.address || '-';
+      
+      document.getElementById('rec-aarti').innerText = `₹${(data.aarti_amount || 0).toLocaleString('en-IN')}`;
+      document.getElementById('rec-abhishek').innerText = `₹${(data.abhishek_amount || 0).toLocaleString('en-IN')}`;
+      document.getElementById('rec-general').innerText = `₹${(data.donation_amount || 0).toLocaleString('en-IN')}`;
+      document.getElementById('rec-total').innerText = `₹${(data.paid || 0).toLocaleString('en-IN')}`;
+      
+      document.getElementById('rec-pay-ref').innerText = data.payment_ref || 'Online Settlement';
+    }
+
+    // Reset view
+    function resetForm() {
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      document.getElementById('donation-form').reset();
+      updateLiveTotal();
+      
+      document.getElementById('receipt-view').classList.add('hidden');
+      document.getElementById('donation-form').classList.remove('hidden');
+      document.getElementById('collage-container').classList.remove('hidden');
+      setBtnLoading(false);
+    }
+  </script>
+</body>
+</html>
