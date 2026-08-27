@@ -1401,34 +1401,24 @@ def register_public():
     return _create_registration(data, registered_by=None, category='online')
 
 # ============================================================
-#  EMAIL RECEIPT & SMTP HELPERS
+#  EMAIL RECEIPT (Brevo HTTP API -- Railway/Render block direct SMTP,
+#  so this uses the same Brevo account/sender as iskconbooks.in's main
+#  book store, and sends synchronously so a gunicorn worker can't
+#  recycle/kill the request before the API call completes.)
 # ============================================================
-import threading
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import requests as http_requests
 
 def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address, mobile):
-    """Sends a beautiful HTML email receipt for the donation using SMTP settings
-    from environment variables. Fails gracefully if SMTP is not configured."""
-    smtp_server = os.environ.get('SMTP_SERVER')
-    smtp_port = os.environ.get('SMTP_PORT')
-    smtp_user = os.environ.get('SMTP_USER')
-    smtp_password = os.environ.get('SMTP_PASSWORD')
-    smtp_from_email = os.environ.get('SMTP_FROM_EMAIL', smtp_user)
-    
-    if not (smtp_server and smtp_port and smtp_user and smtp_password):
-        log.warning(f"SMTP is not fully configured (SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD missing). "
-                    f"Skipping email receipt to {to_email} for donation {ref_id}.")
+    """Sends a branded HTML email receipt for the donation via the Brevo HTTP
+    API. Fails gracefully if BREVO_API_KEY is not configured."""
+    api_key = os.environ.get('BREVO_API_KEY')
+    from_email = os.environ.get('MAIL_USERNAME', 'iskconbooks.in@gmail.com')
+
+    if not api_key:
+        log.warning(f"BREVO_API_KEY is not configured. Skipping email receipt to {to_email} for donation {ref_id}.")
         return False
-        
+
     try:
-        # Create message container
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"Donation Receipt - ISKCON Chandkheda Center - Ref {ref_id}"
-        msg['From'] = f"ISKCON Chandkheda Center <{smtp_from_email}>"
-        msg['To'] = to_email
-        
         # Details text formatting
         details_html = ""
         for title, amt in detail_bits.items():
@@ -1510,34 +1500,26 @@ def send_receipt_email(to_email, name, total_paid, detail_bits, ref_id, address,
         </html>
         """
         
-        msg.attach(MIMEText(html, 'html'))
-        
-        # Connect and send
-        port_num = int(smtp_port)
-        if port_num == 465:
-            server = smtplib.SMTP_SSL(smtp_server, port_num, timeout=10)
-        else:
-            server = smtplib.SMTP(smtp_server, port_num, timeout=10)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_from_email, to_email, msg.as_string())
-        server.quit()
-        log.info(f"Successfully sent receipt email to {to_email} for donation {ref_id}")
-        return True
+        payload = {
+            'sender': {'name': 'ISKCON Chandkheda Center', 'email': from_email},
+            'to': [{'email': to_email}],
+            'subject': f"Donation Receipt - ISKCON Chandkheda Center - Ref {ref_id}",
+            'htmlContent': html,
+        }
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'api-key': api_key,
+        }
+        resp = http_requests.post('https://api.brevo.com/v3/smtp/email', json=payload, headers=headers, timeout=15)
+        if resp.status_code in (200, 201):
+            log.info(f"Successfully sent receipt email to {to_email} for donation {ref_id}")
+            return True
+        log.error(f"Brevo error {resp.status_code} sending receipt to {to_email} for donation {ref_id}: {resp.text[:300]}")
+        return False
     except Exception as e:
         log.error(f"Error sending email receipt to {to_email}: {e}\n{traceback.format_exc()}")
         return False
-
-def send_receipt_email_async(to_email, name, total_paid, detail_bits, ref_id, address, mobile):
-    thread = threading.Thread(
-        target=send_receipt_email,
-        args=(to_email, name, total_paid, detail_bits, ref_id, address, mobile)
-    )
-    thread.daemon = True
-    thread.start()
 
 # ============================================================
 #  PUBLIC DONATION ROUTES
@@ -1745,7 +1727,7 @@ def confirm_donation_checkout():
                 'Maha Abhishek Seva Contribution': abhishek_amount,
                 'Janmashtami Donation Seva': donation_amount
             }
-            send_receipt_email_async(
+            send_receipt_email(
                 to_email=donor_email,
                 name=reg_data['name'],
                 total_paid=aarti_amount + abhishek_amount + donation_amount,
@@ -1841,7 +1823,7 @@ def confirm_donation_payment_link():
                 'Maha Abhishek Seva Contribution': abhishek_amount,
                 'Janmashtami Donation Seva': donation_amount
             }
-            send_receipt_email_async(
+            send_receipt_email(
                 to_email=donor_email,
                 name=reg_data['name'],
                 total_paid=aarti_amount + abhishek_amount + donation_amount,
