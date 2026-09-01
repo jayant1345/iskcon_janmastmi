@@ -2257,6 +2257,38 @@ def export_xlsx():
         for col, width in enumerate(widths, start=1):
             ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
 
+        # Dedicated Aarti & Abhishek Seva sheet -- lets volunteers find and call out
+        # these devotees quickly during the event without scanning the full Registrations sheet.
+        seva_ws = wb.create_sheet('Aarti & Abhishek Seva')
+        seva_headers = ['Token', 'Family Head', 'Mobile', 'Address', 'Aarti Seva (Rs)',
+                         'Abhishek Seva (Rs)', 'Total Paid (Rs)', 'Payment Mode',
+                         'Registered At', 'Gate Attended']
+        for col, title in enumerate(seva_headers, start=1):
+            cell = seva_ws.cell(row=1, column=col, value=title)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        seva_ws.freeze_panes = 'A2'
+
+        seva_rows = [r for r in rows if r['aarti_amount'] or r['abhishek_amount']]
+        for row_idx, r in enumerate(seva_rows, start=2):
+            reg_at = r['reg_at'].strftime('%d/%m/%Y %H:%M') if hasattr(r['reg_at'], 'strftime') else r['reg_at']
+            values = [
+                r['token'], r['name'], r['mobile'], r['address'],
+                r['aarti_amount'], r['abhishek_amount'], r['paid'], r['payment_mode'],
+                reg_at, r['attended'],
+            ]
+            for col, value in enumerate(values, start=1):
+                seva_ws.cell(row=row_idx, column=col, value=value)
+            if r['aarti_amount']:
+                seva_ws.cell(row=row_idx, column=5).fill = aarti_fill
+            if r['abhishek_amount']:
+                seva_ws.cell(row=row_idx, column=6).fill = abhishek_fill
+
+        seva_widths = [8, 22, 13, 30, 14, 16, 12, 12, 16, 12]
+        for col, width in enumerate(seva_widths, start=1):
+            seva_ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
+
         # Legend sheet so the highlighting is self-explanatory without needing to ask.
         legend = wb.create_sheet('Legend')
         legend['A1'] = 'Highlight colors used on the Registrations sheet'
