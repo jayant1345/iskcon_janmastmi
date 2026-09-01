@@ -787,6 +787,7 @@
         <button class="nav-tab" onclick="switchTab('register')"><i class="fa-solid fa-id-card"></i> Register Family</button>
         <button class="nav-tab" onclick="switchTab('scan')"><i class="fa-solid fa-qrcode"></i> Gate Scan</button>
         <button class="nav-tab" onclick="switchTab('registrations')"><i class="fa-solid fa-users"></i> Registrations</button>
+        <button class="nav-tab" onclick="switchTab('seva')"><i class="fa-solid fa-hands-praying"></i> Aarti & Abhishek Seva</button>
         <button class="nav-tab" onclick="switchTab('attendance')"><i class="fa-solid fa-door-open"></i> Attendance</button>
         <button id="nav-users-tab" class="nav-tab hidden" onclick="switchTab('users')"><i class="fa-solid fa-user-gear"></i> Volunteers & Admin</button>
       </nav>
@@ -1113,12 +1114,48 @@
                   <th>Paid</th>
                   <th>Category</th>
                   <th>Registered By</th>
+                  <th>Registration Date</th>
                   <th>Status</th>
                   <th>Pass</th>
                   <th id="reg-actions-header" class="hidden">Actions</th>
                 </tr>
               </thead>
               <tbody id="registrations-table-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB: AARTI & ABHISHEK SEVA ── -->
+      <section id="tab-seva" class="hidden">
+        <div class="glass-card">
+          <div class="glass-card-title">
+            <span><i class="fa-solid fa-hands-praying"></i> Aarti &amp; Abhishek Seva Devotees</span>
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <select id="seva-type-filter" class="form-control" style="width: 170px; font-size: 0.85rem;" onchange="filterSevaTable()">
+                <option value="">All Seva</option>
+                <option value="aarti">Aarti Seva</option>
+                <option value="abhishek">Abhishek Seva</option>
+              </select>
+              <input type="text" id="seva-search" class="form-control" placeholder="Search by name, token, mobile..." style="width: 260px; font-size: 0.85rem;" onkeyup="filterSevaTable()">
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="custom-table" id="seva-table">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Family Head</th>
+                  <th>Mobile</th>
+                  <th>Aarti Seva</th>
+                  <th>Abhishek Seva</th>
+                  <th>Registration Date</th>
+                </tr>
+              </thead>
+              <tbody id="seva-table-body">
                 <!-- Dynamically Populated -->
               </tbody>
             </table>
@@ -1560,6 +1597,7 @@
 
       if (tabId === 'dashboard') loadDashboardStats();
       if (tabId === 'registrations') loadRegistrations();
+      if (tabId === 'seva') loadSevaList();
       if (tabId === 'attendance') loadAttendanceLog();
       if (tabId === 'scan') initScanner(); else stopScanner();
       if (tabId === 'users' && currentUser.role === 'admin') {
@@ -2942,6 +2980,7 @@
             <td>${paidCellHtml(r)}</td>
             <td>${r.category === 'online' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #C4B5FD; border: 1px solid rgba(168, 85, 247, 0.35);"><i class="fa-solid fa-mobile-screen"></i> Online</span>' : (r.category === 'donate' ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.35);"><i class="fa-solid fa-hand-holding-heart"></i> Donation</span>' : '<span class="badge" style="background: rgba(0, 229, 255, 0.12); color: var(--accent-peacock); border: 1px solid var(--border-peacock);">Volunteer</span>')}</td>
             <td>${registeredByLabel(r)}</td>
+            <td style="white-space: nowrap;">${r.reg_at || ''}</td>
             <td>
               ${r.attended ? '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Inside</span>' : '<span class="badge badge-warning">Pending</span>'}
             </td>
@@ -2972,6 +3011,44 @@
       } catch (err) {
         console.error('Registrations load error:', err);
       }
+    }
+
+    let allSevaRows = [];
+
+    async function loadSevaList() {
+      try {
+        const res = await fetch(`${API_BASE}/api/registrations`, { credentials: 'include' });
+        const data = await res.json();
+        allSevaRows = data.registrations.filter(r => r.aarti_amount || r.abhishek_amount);
+        renderSevaTable();
+      } catch (err) {
+        console.error('Seva list load error:', err);
+      }
+    }
+
+    function renderSevaTable() {
+      const tbody = document.getElementById('seva-table-body');
+      tbody.innerHTML = allSevaRows.map(r => `
+        <tr data-has-aarti="${r.aarti_amount ? '1' : '0'}" data-has-abhishek="${r.abhishek_amount ? '1' : '0'}">
+          <td><strong style="color: var(--accent-gold-light);">${r.token}</strong></td>
+          <td>${r.name}</td>
+          <td>${r.mobile}</td>
+          <td>${r.aarti_amount ? `<span class="badge badge-success"><i class="fa-solid fa-check"></i> Aarti Seva &middot; ₹${r.aarti_amount}</span>` : '&mdash;'}</td>
+          <td>${r.abhishek_amount ? `<span class="badge badge-success"><i class="fa-solid fa-check"></i> ${abhishekLabel(r.abhishek_amount)} &middot; ₹${r.abhishek_amount}</span>` : '&mdash;'}</td>
+          <td style="white-space: nowrap;">${r.reg_at || ''}</td>
+        </tr>
+      `).join('');
+      filterSevaTable();
+    }
+
+    function filterSevaTable() {
+      const q = (document.getElementById('seva-search').value || '').toLowerCase();
+      const type = document.getElementById('seva-type-filter').value;
+      document.querySelectorAll('#seva-table-body tr').forEach(row => {
+        const matchesType = !type || (type === 'aarti' && row.dataset.hasAarti === '1') || (type === 'abhishek' && row.dataset.hasAbhishek === '1');
+        const matchesSearch = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = (matchesType && matchesSearch) ? '' : 'none';
+      });
     }
 
     function reprintPass(token) {
